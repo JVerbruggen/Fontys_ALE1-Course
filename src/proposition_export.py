@@ -1,6 +1,14 @@
 from proposition import *
+import os
 
 class GraphVizGenerator():
+    def save_output(string_contents, filename):
+        f = open(filename, "w")
+        f.write(string_contents)
+        f.close()
+
+        os.popen("dot -Tpng -o {0} {1}".format(filename + ".png", filename))
+
     def __init__(self, proposition: Proposition):
         self.proposition = proposition
 
@@ -37,6 +45,3 @@ class GraphVizGenerator():
                 nodes_str += "  " + nodename + " [ UNKOWN ]\n"
 
         return "graph logic {\n" + nodes_str + "}"
-
-
-
