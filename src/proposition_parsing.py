@@ -12,7 +12,7 @@ class PropositionParser:
         self.final_proposition = None
         self.cursor = -1
         self.proposition_stack = []
-        self.expecting = "a"                            # Expect a single proposition as a whole
+        self.expecting = "a"                            # Expect a single proposition as a result
         self.characters = [c for c in ascii_string]
         self.lenc = len(self.characters)
         self.used = False                               # Can only be read once

@@ -43,3 +43,14 @@ def test_generate_proposition():
     assert type(Operator.generate_proposition(Operator.IMPL)) is CompoundProposition
     assert type(Operator.generate_proposition(Operator.BIIMPL)) is CompoundProposition
     assert type(Operator.generate_proposition(Operator.NOT)) is SingularProposition
+
+def test_get_variables():
+    assert Variable('A').get_variables() == ['A']
+    assert CompoundProposition(Operator.AND, Variable('A'), Variable('B')).get_variables() == ['A', 'B']
+    assert CompoundProposition(Operator.AND, Variable('A'), Variable('A')).get_variables() == ['A']
+    assert SingularProposition(Operator.NOT, 
+            CompoundProposition(
+                Operator.AND, 
+                CompoundProposition(Operator.OR, Variable('A'), Variable('C')), 
+                Variable('B')
+            )).get_variables() == ['A', 'B', 'C']
