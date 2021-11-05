@@ -7,3 +7,4 @@ def test_hash():
     assert Hashing.get_hash("0001") == "1"
     assert Hashing.get_hash("10001") == "11"
     assert Hashing.get_hash("100110111") == "137"
+    assert Hashing.get_hash("10100010") == "A2"
