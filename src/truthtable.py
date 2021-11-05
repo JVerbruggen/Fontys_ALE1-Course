@@ -126,14 +126,6 @@ class TruthTable:
 
         return (inserting, indices)
 
-    def _replace_by_dontcare(self, indices: list[int], col_i: int, cols_count: int, set: int):
-        insert_index = indices[0]
-        result_set = self.matrix[-1][insert_index]
-        inserting = self._get_dontcare_values(col_i, cols_count, set, result_set)
-
-        self._matrix_remove_row(indices)
-        self._matrix_insert_row(insert_index, inserting)
-
     def simplify(self):
         length_variable_cols = len(self.matrix[0:-1])
         

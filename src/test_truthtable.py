@@ -73,11 +73,14 @@ def test_simplification_results_similar_withflow():
 
     similar = truthtable._results_similar(result_row, 1, truthtable.matrix[2])
     assert similar == [1,3,5,7]
-    truthtable._replace_by_dontcare(similar, 2, len(truthtable.matrix), 1)
-    assert truthtable.matrix == [[0,-1,0,1,1],[0,-1,1,0,1],[0,1,0,0,0],[0,1,1,1,1]]
+    (inserting, del_indices) = truthtable._get_replacement_preparation(similar, 2, len(truthtable.matrix), 1)
+
+    truthtable._matrix_remove_row(del_indices)
+    truthtable._matrix_insert_row(len(truthtable.matrix), inserting)
+    assert truthtable.matrix == [[0,0,1,1,-1],[0,1,0,1,-1],[0,0,0,0,1],[0,1,1,1,1]]
 
     similar = truthtable._results_similar(result_row, 1, truthtable.matrix[1], simplified_rows=1)
-    assert similar == [2,4]
+    assert similar == [1,3]
 
 def test_matrix_manipulation():
     truthtable = TruthTable(prop)
