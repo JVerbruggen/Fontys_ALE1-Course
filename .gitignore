@@ -1,0 +1,4 @@
+/.pytest_cache
+export/graph.dot
+export/graph.dot.png
+src/__pycache__/
