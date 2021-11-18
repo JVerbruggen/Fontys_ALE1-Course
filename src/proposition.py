@@ -49,7 +49,7 @@ class Variable(Proposition):
         return [self]
 
     def get_sub_propositions(self):
-        return None
+        return [self]
 
     def output(self, state: dict):
         if self.value in state.keys():
@@ -154,7 +154,12 @@ class CompoundProposition(Proposition):
             prop_a = self.proposition_a.cnf()
             prop_b = self.proposition_b.cnf()
 
-            prop_a.get
+            all_literals = True
+            subs = prop_a.get_sub_propositions() + prop_b.get_sub_propositions()
+            for sub in subs:
+                all_literals = sub.is_literal()
+                if all_literals == False:
+                    break
 
             p_items = prop_a.get_literals()
             q_items = prop_b.get_literals()
@@ -212,7 +217,7 @@ class SingularProposition(Proposition):
         return [self.proposition_a]
 
     def get_literals(self):
-        if operator_type is NotOperator:
+        if type(self.operator) is NotOperator:
             if type(self.proposition_a) is Variable:
                 return [self]
             elif type(self.proposition_a) is SingularProposition:
