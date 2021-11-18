@@ -69,7 +69,7 @@ class TruthTable:
 
         printed = ""
 
-        printed += " ".join(var for var in self.variables) + " " + self.proposition.ascii() + "\n"
+        printed += " ".join(var for var in self.variables) + " result\n"
         
         for i in range(len(self.matrix[0])):
             printed += " ".join([(str(col[i]) if col[i] >= 0 else "*") for col in self.matrix]) + "\n"
@@ -126,7 +126,7 @@ class TruthTable:
 
         return (inserting, indices)
 
-    def simplify(self):
+    def simplify(self) -> 'TruthTable':
         length_variable_cols = len(self.matrix[0:-1])
         
         replacements = []
@@ -160,3 +160,46 @@ class TruthTable:
         self._matrix_remove_row(del_indices_final)
 
         return self
+
+    def get_row_values(self, row_i):
+        row = []
+        for i in range(len(self.matrix)-1):
+            row += [self.matrix[i][row_i]]
+        return row
+
+    def get_truth_result_indicies(self):
+        return [i for i in range(self.length()) if self.matrix[-1][i] == 1]
+
+    def length(self) -> int:
+        return len(self.matrix[0])
+    
+    def width(self) -> int:
+        return len(self.matrix)
+
+    def dnf(self) -> Proposition:
+        dnf_props = []
+        truth_result_indices = self.get_truth_result_indicies()
+        for index in truth_result_indices:
+            row = self.get_row_values(index)
+            props = []
+
+            for i in range(len(row)):
+                val = row[i]
+                var = self.variables[i]
+                
+                if val == 0:
+                    props += [SingularProposition(Operator.NOT, Variable(var))]
+                elif val == 1:
+                    props += [Variable(var)]
+
+            dnf_props += [ExtendedProposition(Operator.AND, props)]
+        
+        # Contradiction case
+        if dnf_props == []:
+            var = self.variables[0] # Arbitrary variable
+            dnf_props = [ExtendedProposition(Operator.AND, [SingularProposition(Operator.NOT, Variable(var)), Variable(var)])]
+
+        return ExtendedProposition(Operator.OR, dnf_props)
+
+    def cnf(self) -> Proposition:
+        return self.proposition.cnf()

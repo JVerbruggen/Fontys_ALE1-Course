@@ -1,5 +1,6 @@
 from proposition import *
 from truthtable import *
+from proposition_parsing import *
 
 def test_parse_variables():
     prop = SingularProposition(Operator.NOT, 
@@ -109,3 +110,39 @@ def test_simplified_truthtable():
     assert truthtable.matrix == [[0,-1,-1,1],[0,-1,1,-1],[0,1,-1,-1],[0,1,1,1]]
     assert truthtable.get_binary_string() == "1110"
     assert truthtable.get_hash() == "E"
+
+def test_dnf():
+    prop = PropositionParser("|(|(|(A,B),C),D)").read()
+    tt = TruthTable(prop)
+
+    tt_hash = tt.get_hash()
+
+    tt_dnf = TruthTable(tt.dnf())
+    tt_dnf_hash = tt_dnf.get_hash()
+
+    assert tt_hash == tt_dnf_hash
+
+def test_dnf_simplified():
+    prop = PropositionParser("|(|(|(A,B),C),D)").read()
+    tt = TruthTable(prop)
+    tt.simplify()
+
+    tt_hash = tt.get_hash()
+
+    tt_dnf = TruthTable(tt.dnf())
+    tt_dnf.simplify()
+    tt_dnf_hash = tt_dnf.get_hash()
+
+    assert tt_hash == tt_dnf_hash
+
+# def test_dnf_contradiction():
+#     prop = PropositionParser("&(&(&(A,~(A)),B),&(C,~(C)))").read()
+#     tt = TruthTable(prop)
+
+#     tt_hash = tt.get_hash()
+
+#     tt_dnf = TruthTable(tt.dnf())
+#     tt_dnf_hash = tt_dnf.get_hash()
+
+#     assert str(tt) == str(tt_dnf)
+#     assert tt_hash == tt_dnf_hash
