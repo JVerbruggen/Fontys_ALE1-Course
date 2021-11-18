@@ -56,6 +56,9 @@ class ImplicationOperator(Operator):
 
     def evaluate(self, a, b = False) -> bool:
         return not a or (a and b)
+    
+    def evaluate_extended(self, _):
+        raise NotImplementedError()
 
 class BiimplicationOperator(Operator):
     def ascii(self):
@@ -69,6 +72,9 @@ class BiimplicationOperator(Operator):
     
     def evaluate(self, a, b = False) -> bool:
         return a == b
+
+    def evaluate_extended(self, _):
+        raise NotImplementedError()
     
 class NotOperator(Operator):
     def ascii(self):
