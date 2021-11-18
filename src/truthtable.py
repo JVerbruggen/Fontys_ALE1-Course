@@ -1,4 +1,5 @@
 from proposition import *
+from proposition_operator import *
 from hashing import *
 
 class TruthTable:
@@ -188,18 +189,18 @@ class TruthTable:
                 var = self.variables[i]
                 
                 if val == 0:
-                    props += [SingularProposition(Operator.NOT, Variable(var))]
+                    props += [SingularProposition(OperatorFactory.get_operator('~'), Variable(var))]
                 elif val == 1:
                     props += [Variable(var)]
 
-            dnf_props += [ExtendedProposition(Operator.AND, props)]
+            dnf_props += [ExtendedProposition(OperatorFactory.get_operator('&'), props)]
         
         # Contradiction case
         if dnf_props == []:
             var = self.variables[0] # Arbitrary variable
-            dnf_props = [ExtendedProposition(Operator.AND, [SingularProposition(Operator.NOT, Variable(var)), Variable(var)])]
+            dnf_props = [ExtendedProposition(OperatorFactory.get_operator('&'), [SingularProposition(OperatorFactory.get_operator('~'), Variable(var)), Variable(var)])]
 
-        return ExtendedProposition(Operator.OR, dnf_props)
+        return ExtendedProposition(OperatorFactory.get_operator('|'), dnf_props)
 
     def cnf(self) -> Proposition:
         return self.proposition.cnf()

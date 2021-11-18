@@ -1,71 +1,4 @@
-from enum import Enum
-
-class Operator(Enum):
-    NOT = 1
-    IMPL = 2
-    BIIMPL = 3
-    AND = 4
-    OR = 5
-
-    def ascii(self) -> str:
-        operators = {
-            Operator.NOT: '~',
-            Operator.IMPL: '>',
-            Operator.BIIMPL: '=',
-            Operator.AND: '&',
-            Operator.OR: '|'
-        }
-        return operators[self]
-    
-    def infix(self) -> str:
-        operators = {
-            Operator.NOT: '¬',
-            Operator.IMPL: '=>',
-            Operator.BIIMPL: '<=>',
-            Operator.AND: '∧',
-            Operator.OR: '∨'
-        }
-        return operators[self]
-    
-    def is_operator(char: str) -> bool:
-        chars = ['~', '>', '=', '&', '|']
-        return (char in chars)
-
-    def get_operator(char: str) -> 'Operator':
-        if Operator.is_operator(char) == False: return None
-        operators = {
-            '~': Operator.NOT,
-            '>': Operator.IMPL,
-            '=': Operator.BIIMPL,
-            '&': Operator.AND,
-            '|': Operator.OR
-        }
-        return operators[char]
-
-    def generate_proposition(operator: 'Operator') -> 'Proposition':
-        compound_operators = [2,3,4,5]
-        if operator.value in compound_operators:
-            return CompoundProposition(operator)
-        else:
-            return SingularProposition(operator)
-
-    def evaluate(self, a, b = False) -> bool:
-        if self.value == 1:
-            return not a
-        elif self.value == 2:
-            return not a or (a and b)
-        elif self.value == 3:
-            return a == b
-        elif self.value == 4:
-            return a and b
-        else:
-            return a or b
-
-    def evaluate_extended(self, props: list[int]) -> bool:
-        state = props[0] == 1
-        for i in range(1, len(props)):
-            state = self.evaluate(state, props[i])
-        return state
+from proposition_operator import *
 
 class Proposition:
     def ascii(self) -> str:
@@ -191,5 +124,9 @@ class SingularProposition(Proposition):
     def __str__(self):
         return self.operator.ascii() + "(" + str(self.proposition_a) + ")"
 
-# Implementations
-
+class PropositionFactory:
+    def generate_proposition(operator: Operator) -> Proposition:
+        if operator.is_compound():
+            return CompoundProposition(operator)
+        else:
+            return SingularProposition(operator)

@@ -1,14 +1,15 @@
 from proposition import *
+from proposition_operator import *
 from proposition_export import *
 import os
 
-prop = CompoundProposition(Operator.BIIMPL,
-        CompoundProposition(Operator.IMPL,
+prop = CompoundProposition(BiimplicationOperator(),
+        CompoundProposition(ImplicationOperator(),
             Variable('A'),
             Variable('B')
         ),
-        CompoundProposition(Operator.OR,
-            SingularProposition(Operator.NOT,
+        CompoundProposition(OrOperator(),
+            SingularProposition(NotOperator(),
                 Variable('A')
             ),
             Variable('C')
