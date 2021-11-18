@@ -106,3 +106,6 @@ class OperatorFactory:
         if OperatorFactory.is_operator(char) == False: 
             return None
         return OperatorFactory.get_operator_by_type(OperatorFactory.known_operators[char])
+
+    def __class_getitem__(cls, type):
+        return OperatorFactory.operator_storage[type]

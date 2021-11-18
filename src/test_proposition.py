@@ -1,4 +1,6 @@
 from proposition import *
+from proposition_parsing import *
+from truthtable import *
 
 and_operator = OperatorFactory.get_operator('&')
 or_operator = OperatorFactory.get_operator('|')
@@ -74,3 +76,24 @@ def test_get_variables_extended():
     assert ExtendedProposition(and_operator, [Variable('A'), Variable('B'), CompoundProposition(and_operator, Variable('C'), Variable('D'))]).get_variables() == ['A', 'B', 'C', 'D']
     assert ExtendedProposition(and_operator, [Variable('A'), Variable('B'), CompoundProposition(and_operator, Variable('A'), Variable('D'))]).get_variables() == ['A', 'B', 'D']
     assert ExtendedProposition(and_operator, [Variable('A'), Variable('A'), CompoundProposition(and_operator, Variable('A'), Variable('A'))]).get_variables() == ['A']
+
+def test_cnf():
+    assert PropositionParser("~(P)").read().cnf().ascii() == "~(P)"
+    assert PropositionParser("~(~(P))").read().cnf().ascii() == "P"
+    assert PropositionParser("~(~(~(P)))").read().cnf().ascii() == "~(P)"
+    assert PropositionParser("~(~(~(~(P))))").read().cnf().ascii() == "P"
+    assert PropositionParser("~(&(P,Q))").read().cnf().ascii() == "|(~(P),~(Q))"
+    assert PropositionParser("~(|(P,Q))").read().cnf().ascii() == "&(~(P),~(Q))"
+
+    assert PropositionParser("|(P,Q)").read().cnf().ascii() == "|(P,Q)"
+    assert PropositionParser("|(|(P,Q),R)").read().cnf().ascii() == "&(|(P,R),|(Q,R))"
+    assert PropositionParser("|(|(P,Q),|(R,S))").read().cnf().ascii() == "&(|(P,R),|(P,S),|(Q,R),|(Q,S))"
+    
+    assert PropositionParser(">(P,Q)").read().cnf().ascii() == "|(~(P),Q)"
+    assert PropositionParser(">(~(P),Q)").read().cnf().ascii() == "|(P,Q)"
+    assert PropositionParser(">(P,~(Q))").read().cnf().ascii() == "|(~(P),~(Q))"
+    assert PropositionParser(">(~(P),~(Q))").read().cnf().ascii() == "|(P,~(Q))"
+
+    assert PropositionParser("=(P,Q)").read().cnf().ascii() == "&(|(P,~(P)),|(P,~(Q)),|(Q,~(P)),|(Q,~(Q)))"
+    # assert TruthTable(PropositionParser("=(P,Q)").read()).get_binary_string() == TruthTable(PropositionParser("&(|(P,~(P)),|(P,~(Q)),|(Q,~(P)),|(Q,~(Q)))").read()).get_binary_string()
+
