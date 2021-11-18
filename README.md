@@ -1,3 +1,5 @@
+# Fontys_ALE1-Course
+
 This project is about propositions and operators. This code is able to:
 - Parse ASCII format propositions (such as `>(&(A,|(B,C))~(D))`) into a proposition object in memory
 - Generate truthtables from propositions
