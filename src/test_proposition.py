@@ -31,7 +31,7 @@ def test_singular():
 
 def test_extended_or():
     extended = ExtendedProposition(or_operator, [Variable('A'), Variable('B'), CompoundProposition(and_operator, Variable('C'), Variable('D'))])
-    assert extended.ascii() == "|(A,B,&(C,D))"
+    assert extended.ascii() == "|(A,|(B,&(C,D)))"
     assert extended.infix() == "(A ∨ B ∨ (C ∧ D))"
     assert extended.output({'A': 0, 'B': 0, 'C': 0, 'D': 0}) == False
     assert extended.output({'A': 1, 'B': 0, 'C': 0, 'D': 0}) == True
@@ -43,7 +43,7 @@ def test_extended_or():
 
 def test_extended_and():
     extended = ExtendedProposition(and_operator, [Variable('A'), Variable('B'), CompoundProposition(and_operator, Variable('C'), Variable('D'))])
-    assert extended.ascii() == "&(A,B,&(C,D))"
+    assert extended.ascii() == "&(A,&(B,&(C,D)))"
     assert extended.infix() == "(A ∧ B ∧ (C ∧ D))"
     assert extended.output({'A': 0, 'B': 0, 'C': 0, 'D': 0}) == False
     assert extended.output({'A': 1, 'B': 0, 'C': 0, 'D': 0}) == False
@@ -87,13 +87,13 @@ def test_cnf():
 
     assert PropositionParser("|(P,Q)").read().cnf().ascii() == "|(P,Q)"
     assert PropositionParser("|(|(P,Q),R)").read().cnf().ascii() == "&(|(P,R),|(Q,R))"
-    assert PropositionParser("|(|(P,Q),|(R,S))").read().cnf().ascii() == "&(|(P,R),|(P,S),|(Q,R),|(Q,S))"
+    assert PropositionParser("|(|(P,Q),|(R,S))").read().cnf().ascii() == "&(|(P,R),&(|(P,S),&(|(Q,R),|(Q,S))))"
     
     assert PropositionParser(">(P,Q)").read().cnf().ascii() == "|(~(P),Q)"
     assert PropositionParser(">(~(P),Q)").read().cnf().ascii() == "|(P,Q)"
     assert PropositionParser(">(P,~(Q))").read().cnf().ascii() == "|(~(P),~(Q))"
     assert PropositionParser(">(~(P),~(Q))").read().cnf().ascii() == "|(P,~(Q))"
 
-    assert PropositionParser("=(P,Q)").read().cnf().ascii() == "&(|(P,~(P)),|(P,~(Q)),|(Q,~(P)),|(Q,~(Q)))"
+    assert PropositionParser("=(P,Q)").read().cnf().ascii() == "&(|(P,~(P)),&(|(P,~(Q)),&(|(Q,~(P)),|(Q,~(Q)))))"
     # assert TruthTable(PropositionParser("=(P,Q)").read()).get_binary_string() == TruthTable(PropositionParser("&(|(P,~(P)),|(P,~(Q)),|(Q,~(P)),|(Q,~(Q)))").read()).get_binary_string()
 

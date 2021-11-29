@@ -75,7 +75,24 @@ class ExtendedProposition(Proposition):
         self.propositions = propositions
     
     def ascii(self):
-        return self.operator.ascii() + "(" + ",".join([prop.ascii() for prop in self.propositions]) + ")"
+        closing_brackets = 1
+
+        operator_ascii = self.operator.ascii()
+        ascii_string = operator_ascii + "(" + self.propositions[0].ascii() + ","
+        for i in range(1,len(self.propositions)-1):
+            prop = self.propositions[i]
+
+            ascii_string += operator_ascii + "(" + prop.ascii() + ","
+
+            closing_brackets += 1
+        
+        ascii_string += self.propositions[-1].ascii()
+
+        ascii_string += ''.join(')' for _ in range(closing_brackets))
+
+        return ascii_string
+
+        # return self.operator.ascii() + "(" + ",".join([prop.ascii() for prop in self.propositions]) + ")"
     
     def infix(self):
         return "(" + f" {self.operator.infix()} ".join([prop.infix() for prop in self.propositions]) + ")"
