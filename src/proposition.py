@@ -1,4 +1,5 @@
 from proposition_operator import *
+from debugger import *
 
 class Proposition:
     def ascii(self) -> str:
@@ -19,7 +20,7 @@ class Proposition:
     def output(self, state: dict) -> bool:
         raise NotImplementedError()
 
-    def cnf(self, trace=None) -> 'Proposition':
+    def cnf(self, debugger=None) -> 'Proposition':
         raise NotImplementedError()
 
     def concat_sub_propositions(self, other: 'Proposition') -> list['Proposition']:
@@ -56,7 +57,7 @@ class Variable(Proposition):
             return state[self.value]
         return False
 
-    def cnf(self,trace=None):
+    def cnf(self,debugger=None):
         return Variable(self.value)
 
     def __str__(self):
@@ -73,6 +74,20 @@ class ExtendedProposition(Proposition):
         super().__init__()
         self.operator = operator
         self.propositions = propositions
+
+    def get_rational_equivalent(self, to_process=None):
+        if to_process is None:
+            to_process = self.propositions
+        
+        take = to_process[0]
+        to_process = to_process[1:]
+
+        if len(to_process) == 2:
+            return CompoundProposition(self.operator, to_process[0], to_process[1])
+        elif len(to_process) < 2:
+            raise ValueError()
+
+        return CompoundProposition(self.operator, take, get_rational_equivalent(to_process))
     
     def ascii(self):
         closing_brackets = 1
@@ -115,8 +130,10 @@ class ExtendedProposition(Proposition):
     def get_sub_propositions(self):
         return self.propositions[:]
 
-    def cnf(self,trace=None):
-        raise Exception("CNF not available for extended proposition")
+    def cnf(self,debugger=None):
+        debugger.analyse(self)
+        return self.get_rational_equivalent().cnf(debugger)
+        # raise Exception("CNF not available for extended proposition")
 
     def __str__(self):
         return self.ascii()
@@ -158,21 +175,23 @@ class CompoundProposition(Proposition):
     def get_sub_propositions(self):
         return [self.proposition_a, self.proposition_b]
 
-    def cnf(self,trace=None):
+    def cnf(self,debugger=None):
         # Very not OOP, but if delegated to operator we would have circular import?
         operator_type = type(self.operator)
         if operator_type is AndOperator:
-            pa_items = self.proposition_a.cnf().get_literals()
-            pb_items = self.proposition_b.cnf().get_literals()
+            pa_items = self.proposition_a.cnf(debugger).get_literals()
+            pb_items = self.proposition_b.cnf(debugger).get_literals()
             res = ExtendedProposition(OperatorFactory[AndOperator], pa_items + pb_items)
-            if trace is not None: trace(res.ascii())
+            if debugger is not None: 
+                debugger.trace(res.ascii())
+                debugger.analyse(res)
             return res
         elif operator_type is OrOperator:
             # Something here is wrong
             and_props = []
 
-            prop_a = self.proposition_a.cnf()
-            prop_b = self.proposition_b.cnf()
+            prop_a = self.proposition_a.cnf(debugger)
+            prop_b = self.proposition_b.cnf(debugger)
 
             # all_literals = True
             # subs = prop_a.get_sub_propositions() + prop_b.get_sub_propositions()
@@ -184,10 +203,13 @@ class CompoundProposition(Proposition):
             p_items = prop_a.get_literals()
             q_items = prop_b.get_literals()
 
-            if trace is not None:
-                trace("OR1: " + str(prop_a.ascii()))
-                trace("OR2: " + str(prop_b.ascii()))
-                trace("LIT: " + str([x.ascii() for x in p_items + q_items]))
+            if debugger is not None:
+                debugger.analyse(self)
+                debugger.trace("OR1: " + str(prop_a.ascii()))
+                debugger.trace("OR2: " + str(prop_b.ascii()))
+                debugger.trace("LIT: " + str([x.ascii() for x in p_items + q_items]))
+                debugger.trace("OR2: " + str(prop_b.ascii()))
+
 
             for p_item in p_items:
                 for q_item in q_items:
@@ -197,24 +219,36 @@ class CompoundProposition(Proposition):
                 return and_props[0]
 
             res = ExtendedProposition(OperatorFactory[AndOperator], and_props)
-            if trace is not None: trace(res.ascii())
+            if debugger is not None: 
+                debugger.trace(res.ascii())
+                debugger.analyse(res)
             return res
         elif operator_type is ImplicationOperator:
             res = CompoundProposition(OperatorFactory[OrOperator], 
-                SingularProposition(OperatorFactory[NotOperator], self.proposition_a).cnf(trace), 
+                SingularProposition(OperatorFactory[NotOperator], self.proposition_a), 
                 self.proposition_b
                 )
-            if trace is not None: trace(res.ascii())
-            return res.cnf(trace)
+            res_cnf = res.cnf(debugger)
+            if debugger is not None: 
+                debugger.trace(res.ascii())
+                debugger.analyse(res)
+                debugger.trace(res_cnf.ascii())
+                debugger.analyse(res_cnf)
+            return res_cnf
         elif operator_type is BiimplicationOperator:
             res = CompoundProposition(OperatorFactory[OrOperator], 
                 CompoundProposition(OperatorFactory[AndOperator], self.proposition_a, self.proposition_b), 
                 CompoundProposition(OperatorFactory[AndOperator], 
-                    SingularProposition(OperatorFactory[NotOperator], self.proposition_a).cnf(trace), 
-                    SingularProposition(OperatorFactory[NotOperator], self.proposition_b).cnf(trace))
+                    SingularProposition(OperatorFactory[NotOperator], self.proposition_a).cnf(debugger), 
+                    SingularProposition(OperatorFactory[NotOperator], self.proposition_b).cnf(debugger)).cnf(debugger)
             )
-            if trace is not None: trace(res.ascii())
-            return res.cnf(trace)
+            res_cnf = res.cnf(debugger)
+            if debugger is not None: 
+                debugger.trace(res.ascii())
+                debugger.analyse(res)
+                debugger.trace(res_cnf.ascii())
+                debugger.analyse(res_cnf)
+            return res_cnf
         raise Exception("Unsupported operator")
 
     def __str__(self):
@@ -259,7 +293,7 @@ class SingularProposition(Proposition):
     def output(self, state):
         return self.operator.evaluate(self.proposition_a.output(state))
 
-    def cnf(self,trace=None):
+    def cnf(self,debugger=None):
         # Very not OOP, but if delegated to operator we would have circular import?
         operator_type = type(self.operator)
         if operator_type is NotOperator:
@@ -269,7 +303,7 @@ class SingularProposition(Proposition):
             elif pa_type is SingularProposition:
                 pa_operator_type = type(self.proposition_a.get_operator())
                 if pa_operator_type is NotOperator:
-                    return self.proposition_a.proposition_a.cnf(trace)
+                    return self.proposition_a.proposition_a.cnf(debugger)
                 raise Exception("Unsupported operator")
             elif pa_type is CompoundProposition:
                 pa_operator_type = type(self.proposition_a.get_operator())
@@ -277,20 +311,30 @@ class SingularProposition(Proposition):
                     pa = self.proposition_a.proposition_a
                     pb = self.proposition_a.proposition_b
                     res = CompoundProposition(OperatorFactory[OrOperator],
-                        SingularProposition(OperatorFactory[NotOperator], pa).cnf(trace), # Added temp
-                        SingularProposition(OperatorFactory[NotOperator], pb).cnf(trace)
+                        SingularProposition(OperatorFactory[NotOperator], pa),
+                        SingularProposition(OperatorFactory[NotOperator], pb)
                         )
-                    if trace is not None: trace(res.ascii())
-                    return res.cnf(trace)
+                    res_cnf = res.cnf(debugger)
+                    if debugger is not None: 
+                        debugger.trace(res.ascii())
+                        debugger.analyse(res)
+                        debugger.trace(res_cnf.ascii())
+                        debugger.analyse(res_cnf)
+                    return res_cnf
                 elif pa_operator_type is OrOperator:
                     pa = self.proposition_a.proposition_a
                     pb = self.proposition_a.proposition_b
                     res = CompoundProposition(OperatorFactory[AndOperator],
-                        SingularProposition(OperatorFactory[NotOperator], pa).cnf(trace),
-                        SingularProposition(OperatorFactory[NotOperator], pb).cnf(trace)
+                        SingularProposition(OperatorFactory[NotOperator], pa),
+                        SingularProposition(OperatorFactory[NotOperator], pb)
                         )
-                    if trace is not None: trace(res.ascii())
-                    return res.cnf(trace)
+                    res_cnf = res.cnf(debugger)
+                    if debugger is not None: 
+                        debugger.trace(res.ascii())
+                        debugger.analyse(res)
+                        debugger.trace(res_cnf.ascii())
+                        debugger.analyse(res_cnf)
+                    return res_cnf
                 raise Exception("Unsupported operator")
             raise Exception("Unsupported operator")    
         raise Exception("Unrecognized singular operator in cnf conversion")
