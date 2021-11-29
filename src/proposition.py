@@ -131,7 +131,7 @@ class ExtendedProposition(Proposition):
         return self.propositions[:]
 
     def cnf(self,debugger=None):
-        debugger.analyse(self)
+        if debugger is not None: debugger.analyse(self)
         return self.get_rational_equivalent().cnf(debugger)
         # raise Exception("CNF not available for extended proposition")
 
