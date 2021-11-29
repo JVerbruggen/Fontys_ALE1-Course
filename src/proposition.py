@@ -78,14 +78,13 @@ class ExtendedProposition(Proposition):
     def get_rational_equivalent(self, to_process=None):
         if to_process is None:
             to_process = self.propositions
-        
-        take = to_process[0]
-        to_process = to_process[1:]
 
         if len(to_process) == 2:
             return CompoundProposition(self.operator, to_process[0], to_process[1])
         elif len(to_process) < 2:
             raise ValueError()
+
+        to_process = to_process[1:]
 
         return CompoundProposition(self.operator, take, get_rational_equivalent(to_process))
     
