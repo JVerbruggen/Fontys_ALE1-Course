@@ -96,6 +96,3 @@ def test_cnf():
 
     assert PropositionParser("=(P,Q)").read().cnf().ascii() == "&(|(P,~(P)),&(|(P,~(Q)),&(|(Q,~(P)),|(Q,~(Q)))))"
 
-    assert PropositionParser("=(&(A,C),B)").read().cnf().ascii() == ""
-    # assert TruthTable(PropositionParser("=(P,Q)").read()).get_binary_string() == TruthTable(PropositionParser("&(|(P,~(P)),|(P,~(Q)),|(Q,~(P)),|(Q,~(Q)))").read()).get_binary_string()
-

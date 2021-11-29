@@ -174,15 +174,21 @@ class CompoundProposition(Proposition):
             prop_a = self.proposition_a.cnf()
             prop_b = self.proposition_b.cnf()
 
-            all_literals = True
-            subs = prop_a.get_sub_propositions() + prop_b.get_sub_propositions()
-            for sub in subs:
-                all_literals = sub.is_literal()
-                if all_literals == False:
-                    break
+            # all_literals = True
+            # subs = prop_a.get_sub_propositions() + prop_b.get_sub_propositions()
+            # for sub in subs:
+            #     all_literals = sub.is_literal()
+            #     if all_literals == False:
+            #         break
 
             p_items = prop_a.get_literals()
             q_items = prop_b.get_literals()
+
+            if trace is not None:
+                trace("OR1: " + str(prop_a.ascii()))
+                trace("OR2: " + str(prop_b.ascii()))
+                trace("LIT: " + str([x.ascii() for x in p_items + q_items]))
+
             for p_item in p_items:
                 for q_item in q_items:
                     and_props += [CompoundProposition(OperatorFactory[OrOperator], p_item, q_item)]
@@ -195,7 +201,7 @@ class CompoundProposition(Proposition):
             return res
         elif operator_type is ImplicationOperator:
             res = CompoundProposition(OperatorFactory[OrOperator], 
-                SingularProposition(OperatorFactory[NotOperator], self.proposition_a), 
+                SingularProposition(OperatorFactory[NotOperator], self.proposition_a).cnf(trace), 
                 self.proposition_b
                 )
             if trace is not None: trace(res.ascii())
@@ -204,8 +210,8 @@ class CompoundProposition(Proposition):
             res = CompoundProposition(OperatorFactory[OrOperator], 
                 CompoundProposition(OperatorFactory[AndOperator], self.proposition_a, self.proposition_b), 
                 CompoundProposition(OperatorFactory[AndOperator], 
-                    SingularProposition(OperatorFactory[NotOperator], self.proposition_a), 
-                    SingularProposition(OperatorFactory[NotOperator], self.proposition_b))
+                    SingularProposition(OperatorFactory[NotOperator], self.proposition_a).cnf(trace), 
+                    SingularProposition(OperatorFactory[NotOperator], self.proposition_b).cnf(trace))
             )
             if trace is not None: trace(res.ascii())
             return res.cnf(trace)
@@ -271,20 +277,20 @@ class SingularProposition(Proposition):
                     pa = self.proposition_a.proposition_a
                     pb = self.proposition_a.proposition_b
                     res = CompoundProposition(OperatorFactory[OrOperator],
-                        SingularProposition(OperatorFactory[NotOperator], pa),
-                        SingularProposition(OperatorFactory[NotOperator], pb)
+                        SingularProposition(OperatorFactory[NotOperator], pa).cnf(trace), # Added temp
+                        SingularProposition(OperatorFactory[NotOperator], pb).cnf(trace)
                         )
                     if trace is not None: trace(res.ascii())
-                    return res
+                    return res.cnf(trace)
                 elif pa_operator_type is OrOperator:
                     pa = self.proposition_a.proposition_a
                     pb = self.proposition_a.proposition_b
                     res = CompoundProposition(OperatorFactory[AndOperator],
-                        SingularProposition(OperatorFactory[NotOperator], pa),
-                        SingularProposition(OperatorFactory[NotOperator], pb)
+                        SingularProposition(OperatorFactory[NotOperator], pa).cnf(trace),
+                        SingularProposition(OperatorFactory[NotOperator], pb).cnf(trace)
                         )
                     if trace is not None: trace(res.ascii())
-                    return res
+                    return res.cnf(trace)
                 raise Exception("Unsupported operator")
             raise Exception("Unsupported operator")    
         raise Exception("Unrecognized singular operator in cnf conversion")
