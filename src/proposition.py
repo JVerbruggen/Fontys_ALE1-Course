@@ -79,8 +79,10 @@ class ExtendedProposition(Proposition):
         if to_process is None:
             to_process = self.propositions
 
+        take = to_process[0]
+
         if len(to_process) == 2:
-            return CompoundProposition(self.operator, to_process[0], to_process[1])
+            return CompoundProposition(self.operator, take, to_process[1])
         elif len(to_process) < 2:
             raise ValueError()
 
