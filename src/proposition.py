@@ -19,7 +19,7 @@ class Proposition:
     def output(self, state: dict) -> bool:
         raise NotImplementedError()
 
-    def cnf(self) -> 'Proposition':
+    def cnf(self, trace=None) -> 'Proposition':
         raise NotImplementedError()
 
     def concat_sub_propositions(self, other: 'Proposition') -> list['Proposition']:
@@ -56,7 +56,7 @@ class Variable(Proposition):
             return state[self.value]
         return False
 
-    def cnf(self):
+    def cnf(self,trace=None):
         return Variable(self.value)
 
     def __str__(self):
@@ -115,7 +115,7 @@ class ExtendedProposition(Proposition):
     def get_sub_propositions(self):
         return self.propositions[:]
 
-    def cnf(self):
+    def cnf(self,trace=None):
         raise Exception("CNF not available for extended proposition")
 
     def __str__(self):
@@ -158,14 +158,17 @@ class CompoundProposition(Proposition):
     def get_sub_propositions(self):
         return [self.proposition_a, self.proposition_b]
 
-    def cnf(self):
+    def cnf(self,trace=None):
         # Very not OOP, but if delegated to operator we would have circular import?
         operator_type = type(self.operator)
         if operator_type is AndOperator:
             pa_items = self.proposition_a.cnf().get_literals()
             pb_items = self.proposition_b.cnf().get_literals()
-            return ExtendedProposition(OperatorFactory[AndOperator], pa_items + pb_items)
+            res = ExtendedProposition(OperatorFactory[AndOperator], pa_items + pb_items)
+            if trace is not None: trace(res.ascii())
+            return res
         elif operator_type is OrOperator:
+            # Something here is wrong
             and_props = []
 
             prop_a = self.proposition_a.cnf()
@@ -187,19 +190,25 @@ class CompoundProposition(Proposition):
             if len(and_props) == 1:
                 return and_props[0]
 
-            return ExtendedProposition(OperatorFactory[AndOperator], and_props)
+            res = ExtendedProposition(OperatorFactory[AndOperator], and_props)
+            if trace is not None: trace(res.ascii())
+            return res
         elif operator_type is ImplicationOperator:
-            return CompoundProposition(OperatorFactory[OrOperator], 
+            res = CompoundProposition(OperatorFactory[OrOperator], 
                 SingularProposition(OperatorFactory[NotOperator], self.proposition_a), 
                 self.proposition_b
-                ).cnf()
+                )
+            if trace is not None: trace(res.ascii())
+            return res.cnf(trace)
         elif operator_type is BiimplicationOperator:
-            return CompoundProposition(OperatorFactory[OrOperator], 
+            res = CompoundProposition(OperatorFactory[OrOperator], 
                 CompoundProposition(OperatorFactory[AndOperator], self.proposition_a, self.proposition_b), 
                 CompoundProposition(OperatorFactory[AndOperator], 
                     SingularProposition(OperatorFactory[NotOperator], self.proposition_a), 
                     SingularProposition(OperatorFactory[NotOperator], self.proposition_b))
-                ).cnf()
+            )
+            if trace is not None: trace(res.ascii())
+            return res.cnf(trace)
         raise Exception("Unsupported operator")
 
     def __str__(self):
@@ -244,7 +253,7 @@ class SingularProposition(Proposition):
     def output(self, state):
         return self.operator.evaluate(self.proposition_a.output(state))
 
-    def cnf(self):
+    def cnf(self,trace=None):
         # Very not OOP, but if delegated to operator we would have circular import?
         operator_type = type(self.operator)
         if operator_type is NotOperator:
@@ -254,27 +263,31 @@ class SingularProposition(Proposition):
             elif pa_type is SingularProposition:
                 pa_operator_type = type(self.proposition_a.get_operator())
                 if pa_operator_type is NotOperator:
-                    return self.proposition_a.proposition_a.cnf()
+                    return self.proposition_a.proposition_a.cnf(trace)
                 raise Exception("Unsupported operator")
             elif pa_type is CompoundProposition:
                 pa_operator_type = type(self.proposition_a.get_operator())
                 if pa_operator_type is AndOperator:
                     pa = self.proposition_a.proposition_a
                     pb = self.proposition_a.proposition_b
-                    return CompoundProposition(OperatorFactory[OrOperator],
+                    res = CompoundProposition(OperatorFactory[OrOperator],
                         SingularProposition(OperatorFactory[NotOperator], pa),
                         SingularProposition(OperatorFactory[NotOperator], pb)
                         )
+                    if trace is not None: trace(res.ascii())
+                    return res
                 elif pa_operator_type is OrOperator:
                     pa = self.proposition_a.proposition_a
                     pb = self.proposition_a.proposition_b
-                    return CompoundProposition(OperatorFactory[AndOperator],
+                    res = CompoundProposition(OperatorFactory[AndOperator],
                         SingularProposition(OperatorFactory[NotOperator], pa),
                         SingularProposition(OperatorFactory[NotOperator], pb)
                         )
+                    if trace is not None: trace(res.ascii())
+                    return res
                 raise Exception("Unsupported operator")
             raise Exception("Unsupported operator")    
-        raise Exception("Unsupported operator")
+        raise Exception("Unrecognized singular operator in cnf conversion")
 
     def __str__(self):
         return self.operator.ascii() + "(" + str(self.proposition_a) + ")"
