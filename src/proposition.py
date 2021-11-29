@@ -88,7 +88,7 @@ class ExtendedProposition(Proposition):
 
         to_process = to_process[1:]
 
-        return CompoundProposition(self.operator, take, get_rational_equivalent(to_process))
+        return CompoundProposition(self.operator, take, self.get_rational_equivalent(to_process))
     
     def ascii(self):
         closing_brackets = 1
