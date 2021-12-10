@@ -3,6 +3,13 @@ from truthtable import *
 from proposition_parsing import *
 
 class EqualityTester:
+
+    def test_cnf(ascii: str):
+        prop_one = PropositionParser(ascii).read()
+        prop_cnf = prop_one.cnf()
+
+        return EqualityTester.test_equal(prop_one, prop_cnf)
+
     def test_equal_ascii(ascii_one: str, ascii_other: str) -> bool:
         prop_one = PropositionParser(ascii_one).read()
         prop_other = PropositionParser(ascii_other).read()
