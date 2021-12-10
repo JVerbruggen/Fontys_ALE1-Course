@@ -1,4 +1,5 @@
 from proposition_operator import *
+from proposition_operator_factory import *
 from debugger import *
 
 class Proposition:
@@ -70,7 +71,7 @@ class Variable(Proposition):
         return True
 
 class ExtendedProposition(Proposition):
-    def __init__(self, operator: Operator, propositions: list[Proposition]):
+    def __init__(self, operator: CompoundOperator, propositions: list[Proposition]):
         super().__init__()
         self.operator = operator
         self.propositions = propositions
@@ -146,7 +147,7 @@ class ExtendedProposition(Proposition):
         return False
 
 class CompoundProposition(Proposition):
-    def __init__(self, operator: Operator, proposition_a: Proposition = None, proposition_b: Proposition = None):
+    def __init__(self, operator: CompoundOperator, proposition_a: Proposition = None, proposition_b: Proposition = None):
         super().__init__()
         self.operator = operator
         self.proposition_a = proposition_a
@@ -226,30 +227,36 @@ class CompoundProposition(Proposition):
             return res
         elif operator_type is ImplicationOperator:
             res = CompoundProposition(OperatorFactory[OrOperator], 
-                SingularProposition(OperatorFactory[NotOperator], self.proposition_a), 
-                self.proposition_b
+                SingularProposition(OperatorFactory[NotOperator], self.proposition_a).cnf(debugger), 
+                self.proposition_b.cnf(debugger)
                 )
-            res_cnf = res.cnf(debugger)
+            # res_cnf = res.cnf(debugger)
             if debugger is not None: 
                 debugger.trace(res.ascii())
                 debugger.analyse(res)
-                debugger.trace(res_cnf.ascii())
-                debugger.analyse(res_cnf)
-            return res_cnf
+                # debugger.trace(res_cnf.ascii())
+                # debugger.analyse(res_cnf)
+            return res
+            # return res_cnf
         elif operator_type is BiimplicationOperator:
-            res = CompoundProposition(OperatorFactory[OrOperator], 
-                CompoundProposition(OperatorFactory[AndOperator], self.proposition_a, self.proposition_b), 
-                CompoundProposition(OperatorFactory[AndOperator], 
-                    SingularProposition(OperatorFactory[NotOperator], self.proposition_a).cnf(debugger), 
-                    SingularProposition(OperatorFactory[NotOperator], self.proposition_b).cnf(debugger)).cnf(debugger)
+            # res = CompoundProposition(OperatorFactory[OrOperator], 
+            #     CompoundProposition(OperatorFactory[AndOperator], self.proposition_a.cnf(debugger), self.proposition_b.cnf(debugger)), 
+            #     CompoundProposition(OperatorFactory[AndOperator], 
+            #         SingularProposition(OperatorFactory[NotOperator], self.proposition_a).cnf(debugger), 
+            #         SingularProposition(OperatorFactory[NotOperator], self.proposition_b).cnf(debugger)).cnf(debugger)
+            # )
+            res = CompoundProposition(OperatorFactory[AndOperator],
+                CompoundProposition(OperatorFactory[OrOperator], SingularProposition(OperatorFactory[NotOperator], self.proposition_a), self.proposition_b),
+                CompoundProposition(OperatorFactory[OrOperator], self.proposition_a, SingularProposition(OperatorFactory[NotOperator], self.proposition_b))
             )
-            res_cnf = res.cnf(debugger)
+            # res_cnf = res.cnf(debugger)
             if debugger is not None: 
                 debugger.trace(res.ascii())
                 debugger.analyse(res)
-                debugger.trace(res_cnf.ascii())
-                debugger.analyse(res_cnf)
-            return res_cnf
+                # debugger.trace(res_cnf.ascii())
+                # debugger.analyse(res_cnf)
+            return res
+            # return res_cnf
         raise Exception("Unsupported operator")
 
     def __str__(self):
@@ -262,7 +269,7 @@ class CompoundProposition(Proposition):
         return False
 
 class SingularProposition(Proposition):
-    def __init__(self, operator: Operator, proposition_a: Proposition = None):
+    def __init__(self, operator: SingularOperator, proposition_a: Proposition = None):
         super().__init__()
         self.operator = operator
         self.proposition_a = proposition_a

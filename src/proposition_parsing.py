@@ -1,5 +1,6 @@
 from proposition import *
 from proposition_operator import *
+from proposition_operator_factory import *
 
 class PropositionParser:
     def set_childproposition(parent_proposition: Proposition, location, child_proposition: Proposition):

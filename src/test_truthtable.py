@@ -1,5 +1,6 @@
 from proposition import *
 from proposition_operator import *
+from proposition_operator_factory import *
 from truthtable import *
 from proposition_parsing import *
 

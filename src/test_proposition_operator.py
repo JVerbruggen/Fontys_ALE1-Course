@@ -1,5 +1,6 @@
 import pytest
 from proposition_operator import *
+from proposition_operator_factory import *
 
 and_operator = OperatorFactory.get_operator('&')
 or_operator = OperatorFactory.get_operator('|')
@@ -15,7 +16,9 @@ def test_abstract_operator():
     with pytest.raises(NotImplementedError):
         Operator().is_compound()
     with pytest.raises(NotImplementedError):
-        Operator().evaluate(True, False)
+        CompoundOperator().evaluate(True, False)
+    with pytest.raises(NotImplementedError):
+        SingularOperator().evaluate(True)
 
 def test_is_operator():
     assert OperatorFactory.is_operator('&') == True
@@ -71,10 +74,10 @@ def test_biimpl_operator():
     assert biimpl_operator.evaluate(False, False) == True
 
 def test_not_operator():
-    assert not_operator.evaluate(True, True) == False
-    assert not_operator.evaluate(False, True) == True
-    assert not_operator.evaluate(True, False) == False
-    assert not_operator.evaluate(False, False) == True
+    assert not_operator.evaluate(True) == False
+    assert not_operator.evaluate(False) == True
+    assert not_operator.evaluate(True) == False
+    assert not_operator.evaluate(False) == True
 
 def test_extended_evaluation_error():
     with pytest.raises(NotImplementedError):

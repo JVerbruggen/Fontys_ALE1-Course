@@ -16,3 +16,8 @@ def test_equality_tester():
     # false check
     assert EqualityTester.test_equal_ascii("~(|(P,Q))", "|(~(P),~(Q))") == False
     assert EqualityTester.test_equal_ascii("~(&(P,Q))", "&(~(P),~(Q))") == False
+
+    # cnf equality
+    assert EqualityTester.test_equal_ascii("=(P,Q)", "&(|(~(P),Q),|(P,~(Q)))")
+    assert EqualityTester.test_equal_ascii("=(&(A,C),B)", "&(|(~(&(A,C)),B),|(&(A,C),~(B)))")
+
