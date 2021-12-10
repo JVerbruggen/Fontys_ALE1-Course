@@ -1,6 +1,7 @@
 from proposition import *
 from proposition_parsing import *
 from truthtable import *
+from equality_tester import *
 
 and_operator = OperatorFactory.get_operator('&')
 or_operator = OperatorFactory.get_operator('|')
@@ -95,4 +96,5 @@ def test_cnf():
     assert PropositionParser(">(~(P),~(Q))").read().cnf().ascii() == "|(P,~(Q))"
 
     assert PropositionParser("=(P,Q)").read().cnf().ascii() == "&(|(P,~(P)),&(|(P,~(Q)),&(|(Q,~(P)),|(Q,~(Q)))))"
+    assert EqualityTester.test_equal_ascii("=(P,Q)", "&(|(P,~(P)),&(|(P,~(Q)),&(|(Q,~(P)),|(Q,~(Q)))))")
 
