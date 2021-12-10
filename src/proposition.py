@@ -116,7 +116,7 @@ class ExtendedProposition(Proposition):
         return sorted(variables)
 
     def get_literals(self):
-        return self.propositions[:]
+        return [self.propositions[:]]
 
     def get_sub_propositions(self):
         return self.propositions[:]
@@ -145,6 +145,11 @@ class MultiAnd(ExtendedProposition):
         for i in range(1, len(self.propositions)):
             res = res and self.propositions[i].evaluate(state)
         return res
+    
+    def cnf(self,debugger=None):
+        props = self.get_sub_propositions()
+        props = [p.cnf(debugger) for p in props]
+        return MultiAnd(props)
 
 class MultiOr(ExtendedProposition):
     def ascii_operator(self):
@@ -159,6 +164,11 @@ class MultiOr(ExtendedProposition):
         for i in range(1, len(self.propositions)):
             res = res or self.propositions[i].evaluate(state)
         return res
+    
+    def cnf(self,debugger=None):
+        props = self.get_sub_propositions()
+        props = [p.cnf(debugger) for p in props]
+        return MultiOr(props)
 
 class CompoundProposition(Proposition):
     def __init__(self, proposition_a: Proposition = None, proposition_b: Proposition = None):
@@ -182,17 +192,10 @@ class CompoundProposition(Proposition):
         return sorted(variables)
 
     def get_literals(self):
-        return [self.proposition_a, self.proposition_b]
+        return self.proposition_a.get_literals() + self.proposition_b.get_literals()
 
     def get_sub_propositions(self):
         return [self.proposition_a, self.proposition_b]
-
-    # def cnf(self,debugger=None):
-    #     # Very not OOP, but if delegated to operator we would have circular import?
-    #     cnf_strategy = OperatorFactory.get_cnf_strategy(operator_type)
-    #     cnf_strategy.set_propositions(self.proposition_a, self.proposition_b)
-    #     res = cnf_strategy.get_result()
-    #     return res
 
     def __str__(self):
         return self.ascii_operator() + "(" + str(self.proposition_a) + "," + str(self.proposition_b) + ")"
@@ -211,17 +214,17 @@ class AndProposition(CompoundProposition):
         return self.proposition_a.evaluate(state) and self.proposition_b.evaluate(state)
     
     def cnf(self,debugger=None):
-        # Very not OOP, but if delegated to operator we would have circular import?
         if self.proposition_a == None or self.proposition_b == None:
             raise ValueError("Propositions in strategies not defined")
 
-        pa_items = self.proposition_a.cnf(debugger).get_literals()
-        pb_items = self.proposition_b.cnf(debugger).get_literals()
-        res = MultiAnd(pa_items + pb_items)
-        if debugger is not None: 
-            debugger.trace(res.ascii())
-            debugger.analyse(res)
-        return res
+        return self
+        # pa_items = self.proposition_a.cnf(debugger).get_literals()
+        # pb_items = self.proposition_b.cnf(debugger).get_literals()
+        # res = MultiAnd(pa_items + pb_items)
+        # if debugger is not None: 
+        #     debugger.trace(res.ascii())
+        #     debugger.analyse(res)
+        # return res
 
 class OrProposition(CompoundProposition):
     def ascii_operator(self):
@@ -233,19 +236,12 @@ class OrProposition(CompoundProposition):
     def evaluate(self, state):
         return self.proposition_a.evaluate(state) or self.proposition_b.evaluate(state)
 
+
     def cnf(self,debugger=None):
-        # Something here is wrong
         and_props = []
 
         prop_a = self.proposition_a.cnf(debugger)
         prop_b = self.proposition_b.cnf(debugger)
-
-        # all_literals = True
-        # subs = prop_a.get_sub_propositions() + prop_b.get_sub_propositions()
-        # for sub in subs:
-        #     all_literals = sub.is_literal()
-        #     if all_literals == False:
-        #         break
 
         p_items = prop_a.get_literals()
         q_items = prop_b.get_literals()
@@ -266,6 +262,7 @@ class OrProposition(CompoundProposition):
             return and_props[0]
 
         res = MultiAnd(and_props)
+        # Dont CNF this, only CNF its children
         if debugger is not None: 
             debugger.trace(res.ascii())
             debugger.analyse(res)
@@ -283,17 +280,17 @@ class ImplicationProposition(CompoundProposition):
         return not pa_evaluated or (pa_evaluated and self.proposition_b.evaluate(state))
     
     def cnf(self,debugger=None):
-        res = OrProposition(NotProposition(self.proposition_a).cnf(debugger), 
-            self.proposition_b.cnf(debugger)
+        res = OrProposition(NotProposition(self.proposition_a), 
+            self.proposition_b
             )
-        # res_cnf = res.cnf(debugger)
+        res_cnf = res.cnf(debugger)
         if debugger is not None: 
             debugger.trace(res.ascii())
             debugger.analyse(res)
-            # debugger.trace(res_cnf.ascii())
-            # debugger.analyse(res_cnf)
-        return res
-        # return res_cnf
+            debugger.trace(res_cnf.ascii())
+            debugger.analyse(res_cnf)
+        # return res
+        return res_cnf
 
 class BiimplicationProposition(CompoundProposition):
     def ascii_operator(self):
@@ -306,9 +303,12 @@ class BiimplicationProposition(CompoundProposition):
         return self.proposition_a.evaluate(state) == self.proposition_b.evaluate(state)
     
     def cnf(self,debugger=None):
+        prop_a_cnfed = self.proposition_a.cnf(debugger)
+        prop_b_cnfed = self.proposition_b.cnf(debugger)
+
         res = AndProposition(
-            OrProposition(NotProposition(self.proposition_a), self.proposition_b),
-            OrProposition(self.proposition_a, NotProposition(self.proposition_b))
+            OrProposition(NotProposition(prop_a_cnfed).cnf(debugger), prop_b_cnfed),
+            OrProposition(prop_a_cnfed, NotProposition(prop_b_cnfed).cnf(debugger))
         )
         res_cnf = res.cnf(debugger)
         if debugger is not None: 
@@ -316,7 +316,7 @@ class BiimplicationProposition(CompoundProposition):
             debugger.analyse(res)
             debugger.trace(res_cnf.ascii())
             debugger.analyse(res_cnf)
-        return res
+        return res_cnf
 
 class SingularProposition(Proposition):
     def __init__(self, proposition_a: Proposition = None):
@@ -360,7 +360,7 @@ class NotProposition(SingularProposition):
         pa_type = type(self.proposition_a)
         if pa_type is Variable:
             return self
-        elif pa_type is NotProposition:
+        elif issubclass(pa_type, SingularProposition):
             return self.proposition_a.proposition_a.cnf(debugger)
         elif issubclass(pa_type, CompoundProposition):
             if pa_type is AndProposition:
@@ -391,12 +391,27 @@ class NotProposition(SingularProposition):
                     debugger.trace(res_cnf.ascii())
                     debugger.analyse(res_cnf)
                 return res_cnf
+            # else:
+            #     return NotProposition(self.proposition_a.cnf(debugger)).cnf(debugger)
             raise Exception("Unsupported operator")
-        raise Exception("Unsupported operator")    
+        elif issubclass(pa_type, ExtendedProposition): 
+            old_props = self.proposition_a.get_sub_propositions()
+            props = [NotProposition(p) for p in old_props]
+            res = MultiAnd(props) if pa_type == MultiOr else MultiOr(props)
+            res_cnf = res.cnf()
+
+            if debugger is not None: 
+                debugger.trace(res.ascii())
+                debugger.analyse(res)
+                debugger.trace(res_cnf.ascii())
+                debugger.analyse(res_cnf)
+            
+            return res_cnf
+        raise Exception("Unsupported operator")     
 
     def get_literals(self):
         if type(self.proposition_a) is Variable:
             return [self]
         elif type(self.proposition_a) is NotProposition:
-            return [self.proposition_a.proposition_a.get_literals()]
+            return self.proposition_a.proposition_a.get_literals()
         raise NotImplementedError()

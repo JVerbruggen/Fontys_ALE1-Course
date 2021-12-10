@@ -89,6 +89,10 @@ def test_cnf():
     assert PropositionParser("=(&(A,C),B)").read().cnf().ascii() == "&(|(~(&(A,C)),B),|(&(A,C),~(B)))"
     # assert PropositionParser("=(=(A,C),B)").read().cnf().ascii() == ""
 
+def test_get_literals():
+    assert [lit.ascii() for lit in PropositionParser("&(P,~(Q))").read().get_literals()] == ['P', '~(Q)']
+    assert [lit.ascii() for lit in PropositionParser("|(~(&(A,C)),B)").read().get_literals()] == ['P', '~(Q)']
+
 def test_cnf_notation():
     pass
 
