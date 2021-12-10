@@ -25,4 +25,5 @@ def test_equality_tester():
     assert EqualityTester.test_cnf("=(P,Q)")
     assert EqualityTester.test_cnf("=(&(A,C),B)")
     assert EqualityTester.test_cnf("=(&(A,C),B)")
+    # assert EqualityTester.test_cnf("=(=(A,C),B)")
 

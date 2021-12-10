@@ -310,12 +310,12 @@ class BiimplicationProposition(CompoundProposition):
             OrProposition(NotProposition(self.proposition_a), self.proposition_b),
             OrProposition(self.proposition_a, NotProposition(self.proposition_b))
         )
-        # res_cnf = res.cnf(debugger)
+        res_cnf = res.cnf(debugger)
         if debugger is not None: 
             debugger.trace(res.ascii())
             debugger.analyse(res)
-            # debugger.trace(res_cnf.ascii())
-            # debugger.analyse(res_cnf)
+            debugger.trace(res_cnf.ascii())
+            debugger.analyse(res_cnf)
         return res
 
 class SingularProposition(Proposition):
