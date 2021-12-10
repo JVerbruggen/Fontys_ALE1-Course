@@ -1,6 +1,5 @@
 from proposition import *
-from proposition_operator import *
-from proposition_operator_factory import *
+from proposition_factory import *
 
 class PropositionParser:
     def set_childproposition(parent_proposition: Proposition, location, child_proposition: Proposition):
@@ -54,13 +53,13 @@ class PropositionParser:
 
             exp = self.expecting[0]             # Check expected value: 'a' and 'b' are propositions, '(' and ',' are checked but basically ignored, ')' pops proposition stack
             if exp in ['a', 'b']:
-                char_operator = OperatorFactory.get_operator(char)                    # Check if char is operator
-                if char_operator != None:
-                    proposition = PropositionFactory.generate_proposition(char_operator)
+                is_operator = PropositionFactory.exists(char)                    # Check if char is operator
+                if is_operator:
+                    proposition = PropositionFactory.get_proposition(char)
                     self.process_proposition(proposition, exp)
                     self.proposition_stack += [proposition]
 
-                    if type(proposition) is CompoundProposition:                        # Expect two propositions to be next
+                    if issubclass(type(proposition), CompoundProposition):                        # Expect two propositions to be next
                         self.expecting = "(a,b)" + self.expecting[1:]
                     else:                                                               # or expect one
                         self.expecting = "(a)" + self.expecting[1:]

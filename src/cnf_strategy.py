@@ -1,5 +1,5 @@
 from proposition import *
-from proposition_operator_factory import *
+from proposition_operator_factory import OperatorFactory
 from debugger import *
 
 class CNFStrategy:

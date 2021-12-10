@@ -1,14 +1,12 @@
 from proposition import *
-from proposition_operator import *
-from proposition_operator_factory import *
 from proposition_parsing import PropositionParser
 
 def test_set_childposition():
-    empty_and = CompoundProposition(OperatorFactory.get_operator('&'))
+    empty_and = AndProposition()
     PropositionParser.set_childproposition(empty_and, "b", Variable("Y"))
     assert empty_and.ascii() == "&(incomplete proposition)"
 
-    empty_or = CompoundProposition(OperatorFactory.get_operator('|'))
+    empty_or = OrProposition()
     PropositionParser.set_childproposition(empty_or, "a", Variable("X"))
     PropositionParser.set_childproposition(empty_or, "b", Variable("Y"))
     assert empty_or.ascii() == "|(X,Y)"

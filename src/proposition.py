@@ -1,8 +1,15 @@
-from proposition_operator import *
-from proposition_operator_factory import *
 from debugger import *
 
 class Proposition:
+    def ascii_operator(self):
+        raise NotImplementedError()
+
+    def infix_operator(self):
+        raise NotImplementedError()
+
+    def evaluate(self, state):
+        raise NotImplementedError()
+
     def ascii(self) -> str:
         raise NotImplementedError()
 
@@ -18,17 +25,11 @@ class Proposition:
     def get_sub_propositions(self) -> list['Proposition']:
         raise NotImplementedError()
 
-    def output(self, state: dict) -> bool:
-        raise NotImplementedError()
-
     def cnf(self, debugger=None) -> 'Proposition':
         raise NotImplementedError()
 
     def concat_sub_propositions(self, other: 'Proposition') -> list['Proposition']:
         return self.get_literals() + other.get_literals()
-
-    def get_operator(self):
-        raise NotImplementedError()
 
     def is_literal(self):
         raise NotImplementedError()
@@ -53,7 +54,7 @@ class Variable(Proposition):
     def get_sub_propositions(self):
         return [self]
 
-    def output(self, state: dict):
+    def evaluate(self, state):
         if self.value in state.keys():
             return state[self.value]
         return False
@@ -64,16 +65,12 @@ class Variable(Proposition):
     def __str__(self):
         return self.value
 
-    def get_operator(self):
-        raise NotImplementedError()
-
     def is_literal(self):
         return True
 
 class ExtendedProposition(Proposition):
-    def __init__(self, operator: CompoundOperator, propositions: list[Proposition]):
+    def __init__(self, propositions: list[Proposition]):
         super().__init__()
-        self.operator = operator
         self.propositions = propositions
 
     def get_rational_equivalent(self, to_process=None):
@@ -83,18 +80,18 @@ class ExtendedProposition(Proposition):
         take = to_process[0]
 
         if len(to_process) == 2:
-            return CompoundProposition(self.operator, take, to_process[1])
+            return CompoundProposition(take, to_process[1])
         elif len(to_process) < 2:
             raise ValueError()
 
         to_process = to_process[1:]
 
-        return CompoundProposition(self.operator, take, self.get_rational_equivalent(to_process))
+        return CompoundProposition(take, self.get_rational_equivalent(to_process))
     
     def ascii(self):
         closing_brackets = 1
 
-        operator_ascii = self.operator.ascii()
+        operator_ascii = self.ascii_operator()
         ascii_string = operator_ascii + "(" + self.propositions[0].ascii() + ","
         for i in range(1,len(self.propositions)-1):
             prop = self.propositions[i]
@@ -108,17 +105,9 @@ class ExtendedProposition(Proposition):
         ascii_string += ''.join(')' for _ in range(closing_brackets))
 
         return ascii_string
-
-        # return self.operator.ascii() + "(" + ",".join([prop.ascii() for prop in self.propositions]) + ")"
     
     def infix(self):
-        return "(" + f" {self.operator.infix()} ".join([prop.infix() for prop in self.propositions]) + ")"
-
-    def output(self, state):
-        evaluated_props = []
-        for prop in self.propositions:
-            evaluated_props += [prop.output(state)]
-        return self.operator.evaluate_extended(evaluated_props)
+        return "(" + f" {self.infix_operator()} ".join([prop.infix() for prop in self.propositions]) + ")"
     
     def get_variables(self):
         variables = []
@@ -132,34 +121,58 @@ class ExtendedProposition(Proposition):
     def get_sub_propositions(self):
         return self.propositions[:]
 
-    def cnf(self,debugger=None):
-        if debugger is not None: debugger.analyse(self)
-        return self.get_rational_equivalent().cnf(debugger)
-        # raise Exception("CNF not available for extended proposition")
+    # def cnf(self,debugger=None):
+    #     if debugger is not None: debugger.analyse(self)
+    #     return self.get_rational_equivalent().cnf(debugger)
+    #     # raise Exception("CNF not available for extended proposition")
 
     def __str__(self):
         return self.ascii()
     
-    def get_operator(self):
-        return self.operator
-    
     def is_literal(self):
         return False
 
+class MultiAnd(ExtendedProposition):
+    def ascii_operator(self):
+        return '&'
+    
+    def infix_operator(self):
+        return '∧'
+
+    def evaluate(self, state):
+        if len(self.propositions) == 0: return False
+        res = self.propositions[0].evaluate(state)
+        for i in range(1, len(self.propositions)):
+            res = res and self.propositions[i].evaluate(state)
+        return res
+
+class MultiOr(ExtendedProposition):
+    def ascii_operator(self):
+        return '|'
+    
+    def infix_operator(self):
+        return '∨'
+
+    def evaluate(self, state):
+        if len(self.propositions) == 0: return False
+        res = self.propositions[0].evaluate(state)
+        for i in range(1, len(self.propositions)):
+            res = res or self.propositions[i].evaluate(state)
+        return res
+
 class CompoundProposition(Proposition):
-    def __init__(self, operator: CompoundOperator, proposition_a: Proposition = None, proposition_b: Proposition = None):
+    def __init__(self, proposition_a: Proposition = None, proposition_b: Proposition = None):
         super().__init__()
-        self.operator = operator
         self.proposition_a = proposition_a
         self.proposition_b = proposition_b
-    
+
     def ascii(self):
         if self.proposition_a == None or self.proposition_b == None:
-            return self.operator.ascii() + "(incomplete proposition)"
-        return self.operator.ascii() + "(" + self.proposition_a.ascii() + "," + self.proposition_b.ascii() + ")"
+            return self.ascii_operator() + "(incomplete proposition)"
+        return self.ascii_operator() + "(" + self.proposition_a.ascii() + "," + self.proposition_b.ascii() + ")"
     
     def infix(self):
-        return "(" + self.proposition_a.infix() + " " + self.operator.infix() + " " + self.proposition_b.infix() + ")"
+        return "(" + self.proposition_a.infix() + " " + self.infix_operator() + " " + self.proposition_b.infix() + ")"
 
     def get_variables(self):
         if self.proposition_a == None or self.proposition_b == None:
@@ -171,43 +184,152 @@ class CompoundProposition(Proposition):
     def get_literals(self):
         return [self.proposition_a, self.proposition_b]
 
-    def output(self, state):
-        return self.operator.evaluate(self.proposition_a.output(state), self.proposition_b.output(state))
-
     def get_sub_propositions(self):
         return [self.proposition_a, self.proposition_b]
 
-    def cnf(self,debugger=None):
-        # Very not OOP, but if delegated to operator we would have circular import?
-        operator_type = type(self.operator)
-
-        cnf_strategy = self.operator.get_cnf_strategy(debugger)
-        cnf_strategy.set_propositions(self.proposition_a, self.proposition_b)
-        res = cnf_strategy.get_result()
-        return res
+    # def cnf(self,debugger=None):
+    #     # Very not OOP, but if delegated to operator we would have circular import?
+    #     cnf_strategy = OperatorFactory.get_cnf_strategy(operator_type)
+    #     cnf_strategy.set_propositions(self.proposition_a, self.proposition_b)
+    #     res = cnf_strategy.get_result()
+    #     return res
 
     def __str__(self):
-        return self.operator.ascii() + "(" + str(self.proposition_a) + "," + str(self.proposition_b) + ")"
-    
-    def get_operator(self):
-        return self.operator
+        return self.ascii_operator() + "(" + str(self.proposition_a) + "," + str(self.proposition_b) + ")"
 
     def is_literal(self):
         return False
 
+class AndProposition(CompoundProposition):
+    def ascii_operator(self):
+        return '&'
+
+    def infix_operator(self):
+        return '∧'
+
+    def evaluate(self, state):
+        return self.proposition_a.evaluate(state) and self.proposition_b.evaluate(state)
+    
+    def cnf(self,debugger=None):
+        # Very not OOP, but if delegated to operator we would have circular import?
+        if self.proposition_a == None or self.proposition_b == None:
+            raise ValueError("Propositions in strategies not defined")
+
+        pa_items = self.proposition_a.cnf(debugger).get_literals()
+        pb_items = self.proposition_b.cnf(debugger).get_literals()
+        res = MultiAnd(pa_items + pb_items)
+        if debugger is not None: 
+            debugger.trace(res.ascii())
+            debugger.analyse(res)
+        return res
+
+class OrProposition(CompoundProposition):
+    def ascii_operator(self):
+        return '|'
+    
+    def infix_operator(self):
+        return '∨'
+    
+    def evaluate(self, state):
+        return self.proposition_a.evaluate(state) or self.proposition_b.evaluate(state)
+
+    def cnf(self,debugger=None):
+        # Something here is wrong
+        and_props = []
+
+        prop_a = self.proposition_a.cnf(debugger)
+        prop_b = self.proposition_b.cnf(debugger)
+
+        # all_literals = True
+        # subs = prop_a.get_sub_propositions() + prop_b.get_sub_propositions()
+        # for sub in subs:
+        #     all_literals = sub.is_literal()
+        #     if all_literals == False:
+        #         break
+
+        p_items = prop_a.get_literals()
+        q_items = prop_b.get_literals()
+
+        if debugger is not None:
+            debugger.analyse(self)
+            debugger.trace("OR1: " + str(prop_a.ascii()))
+            debugger.trace("OR2: " + str(prop_b.ascii()))
+            debugger.trace("LIT: " + str([x.ascii() for x in p_items + q_items]))
+            debugger.trace("OR2: " + str(prop_b.ascii()))
+
+
+        for p_item in p_items:
+            for q_item in q_items:
+                and_props += [OrProposition( p_item, q_item)]
+
+        if len(and_props) == 1:
+            return and_props[0]
+
+        res = MultiAnd(and_props)
+        if debugger is not None: 
+            debugger.trace(res.ascii())
+            debugger.analyse(res)
+        return res
+
+class ImplicationProposition(CompoundProposition):
+    def ascii_operator(self):
+        return '>'
+    
+    def infix_operator(self):
+        return '=>'
+    
+    def evaluate(self, state):
+        pa_evaluated = self.proposition_a.evaluate(state)
+        return not pa_evaluated or (pa_evaluated and self.proposition_b.evaluate(state))
+    
+    def cnf(self,debugger=None):
+        res = OrProposition(NotProposition(self.proposition_a).cnf(debugger), 
+            self.proposition_b.cnf(debugger)
+            )
+        # res_cnf = res.cnf(debugger)
+        if debugger is not None: 
+            debugger.trace(res.ascii())
+            debugger.analyse(res)
+            # debugger.trace(res_cnf.ascii())
+            # debugger.analyse(res_cnf)
+        return res
+        # return res_cnf
+
+class BiimplicationProposition(CompoundProposition):
+    def ascii_operator(self):
+        return '='
+    
+    def infix_operator(self):
+        return '<=>'
+    
+    def evaluate(self, state):
+        return self.proposition_a.evaluate(state) == self.proposition_b.evaluate(state)
+    
+    def cnf(self,debugger=None):
+        res = AndProposition(
+            OrProposition(NotProposition(self.proposition_a), self.proposition_b),
+            OrProposition(self.proposition_a, NotProposition(self.proposition_b))
+        )
+        # res_cnf = res.cnf(debugger)
+        if debugger is not None: 
+            debugger.trace(res.ascii())
+            debugger.analyse(res)
+            # debugger.trace(res_cnf.ascii())
+            # debugger.analyse(res_cnf)
+        return res
+
 class SingularProposition(Proposition):
-    def __init__(self, operator: SingularOperator, proposition_a: Proposition = None):
+    def __init__(self, proposition_a: Proposition = None):
         super().__init__()
-        self.operator = operator
         self.proposition_a = proposition_a
 
     def ascii(self):
         if self.proposition_a == None:
-            return self.operator.ascii() + "(incomplete proposition)"
-        return self.operator.ascii() + "(" + self.proposition_a.ascii() + ")"
+            return self.ascii_operator() + "(incomplete proposition)"
+        return self.ascii_operator() + "(" + self.proposition_a.ascii() + ")"
 
     def infix(self):
-        return self.operator.infix() + self.proposition_a.infix()
+        return self.infix_operator() + self.proposition_a.infix()
 
     def get_variables(self):
         if self.proposition_a == None:
@@ -217,75 +339,64 @@ class SingularProposition(Proposition):
     def get_sub_propositions(self):
         return [self.proposition_a]
 
-    def get_literals(self):
-        if type(self.operator) is NotOperator:
-            if type(self.proposition_a) is Variable:
-                return [self]
-            elif type(self.proposition_a) is SingularProposition:
-                return [self.proposition_a.proposition_a.get_literals()]
-        raise Exception("Literals not supported in this case")
-
-    def output(self, state):
-        return self.operator.evaluate(self.proposition_a.output(state))
-
-    def cnf(self,debugger=None):
-        # Very not OOP, but if delegated to operator we would have circular import?
-        operator_type = type(self.operator)
-        if operator_type is NotOperator:
-            pa_type = type(self.proposition_a)
-            if pa_type is Variable:
-                return self
-            elif pa_type is SingularProposition:
-                pa_operator_type = type(self.proposition_a.get_operator())
-                if pa_operator_type is NotOperator:
-                    return self.proposition_a.proposition_a.cnf(debugger)
-                raise Exception("Unsupported operator")
-            elif pa_type is CompoundProposition:
-                pa_operator_type = type(self.proposition_a.get_operator())
-                if pa_operator_type is AndOperator:
-                    pa = self.proposition_a.proposition_a
-                    pb = self.proposition_a.proposition_b
-                    res = CompoundProposition(OperatorFactory[OrOperator],
-                        SingularProposition(OperatorFactory[NotOperator], pa),
-                        SingularProposition(OperatorFactory[NotOperator], pb)
-                        )
-                    res_cnf = res.cnf(debugger)
-                    if debugger is not None: 
-                        debugger.trace(res.ascii())
-                        debugger.analyse(res)
-                        debugger.trace(res_cnf.ascii())
-                        debugger.analyse(res_cnf)
-                    return res_cnf
-                elif pa_operator_type is OrOperator:
-                    pa = self.proposition_a.proposition_a
-                    pb = self.proposition_a.proposition_b
-                    res = CompoundProposition(OperatorFactory[AndOperator],
-                        SingularProposition(OperatorFactory[NotOperator], pa),
-                        SingularProposition(OperatorFactory[NotOperator], pb)
-                        )
-                    res_cnf = res.cnf(debugger)
-                    if debugger is not None: 
-                        debugger.trace(res.ascii())
-                        debugger.analyse(res)
-                        debugger.trace(res_cnf.ascii())
-                        debugger.analyse(res_cnf)
-                    return res_cnf
-                raise Exception("Unsupported operator")
-            raise Exception("Unsupported operator")    
-        raise Exception("Unrecognized singular operator in cnf conversion")
-
     def __str__(self):
-        return self.operator.ascii() + "(" + str(self.proposition_a) + ")"
-    
-    def get_operator(self):
-        return self.operator
+        return self.ascii_operator() + "(" + str(self.proposition_a) + ")"
 
     def is_literal(self):
         return self.proposition_a.is_literal() # ~(A) is also a literal
 
-class PropositionFactory:
-    def generate_proposition(operator: Operator) -> Proposition:
-        if operator.is_compound():
-            return CompoundProposition(operator)
-        else:
-            return SingularProposition(operator)
+class NotProposition(SingularProposition):
+    def ascii_operator(self):
+        return '~'
+    
+    def infix_operator(self):
+        return '¬'
+    
+    def evaluate(self, state):
+        return not self.proposition_a.evaluate(state)
+    
+    def cnf(self,debugger=None):
+        # Very not OOP, but if delegated to operator we would have circular import?
+        pa_type = type(self.proposition_a)
+        if pa_type is Variable:
+            return self
+        elif pa_type is NotProposition:
+            return self.proposition_a.proposition_a.cnf(debugger)
+        elif issubclass(pa_type, CompoundProposition):
+            if pa_type is AndProposition:
+                pa = self.proposition_a.proposition_a
+                pb = self.proposition_a.proposition_b
+                res = OrProposition(
+                    NotProposition(pa),
+                    NotProposition(pb)
+                    )
+                res_cnf = res.cnf(debugger)
+                if debugger is not None: 
+                    debugger.trace(res.ascii())
+                    debugger.analyse(res)
+                    debugger.trace(res_cnf.ascii())
+                    debugger.analyse(res_cnf)
+                return res_cnf
+            elif pa_type is OrProposition:
+                pa = self.proposition_a.proposition_a
+                pb = self.proposition_a.proposition_b
+                res = AndProposition(
+                    NotProposition(pa),
+                    NotProposition(pb)
+                    )
+                res_cnf = res.cnf(debugger)
+                if debugger is not None: 
+                    debugger.trace(res.ascii())
+                    debugger.analyse(res)
+                    debugger.trace(res_cnf.ascii())
+                    debugger.analyse(res_cnf)
+                return res_cnf
+            raise Exception("Unsupported operator")
+        raise Exception("Unsupported operator")    
+
+    def get_literals(self):
+        if type(self.proposition_a) is Variable:
+            return [self]
+        elif type(self.proposition_a) is NotProposition:
+            return [self.proposition_a.proposition_a.get_literals()]
+        raise NotImplementedError()

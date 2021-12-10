@@ -1,14 +1,11 @@
 from proposition import *
-from proposition_operator import *
-from proposition_operator_factory import *
 from truthtable import *
 from proposition_parsing import *
 
 def test_parse_variables():
-    prop = SingularProposition(OperatorFactory.get_operator('~'), 
-    CompoundProposition(
-        OperatorFactory.get_operator('&'), 
-        CompoundProposition(OperatorFactory.get_operator('|'), Variable('A'), Variable('C')), 
+    prop = NotProposition(
+    AndProposition(
+        OrProposition(Variable('A'), Variable('C')), 
         Variable('B')
     ))
 
@@ -16,10 +13,9 @@ def test_parse_variables():
     assert variable_matrix == [[0,0,0,0,1,1,1,1],[0,0,1,1,0,0,1,1],[0,1,0,1,0,1,0,1]]
 
 def test_evaluate_proposition():
-    prop = SingularProposition(OperatorFactory.get_operator('~'), 
-    CompoundProposition(
-        OperatorFactory.get_operator('&'), 
-        CompoundProposition(OperatorFactory.get_operator('|'), Variable('A'), Variable('C')), 
+    prop = NotProposition(
+    AndProposition(
+        OrProposition(Variable('A'), Variable('C')), 
         Variable('B')
     ))
 
@@ -28,10 +24,9 @@ def test_evaluate_proposition():
     assert evaluated_matrix == [1,1,1,0,1,1,0,0]
 
 def test_get_truthtable():
-    prop = SingularProposition(OperatorFactory.get_operator('~'), 
-    CompoundProposition(
-        OperatorFactory.get_operator('&'), 
-        CompoundProposition(OperatorFactory.get_operator('|'), Variable('A'), Variable('C')), 
+    prop = NotProposition(
+    AndProposition(
+        OrProposition(Variable('A'), Variable('C')), 
         Variable('B')
     ))
 
@@ -41,8 +36,8 @@ def test_get_truthtable():
     assert truthtable.get_hash() == "37"
 
 def test_predefined_truthtable():
-    prop = CompoundProposition(OperatorFactory.get_operator('&'),
-        CompoundProposition(OperatorFactory.get_operator('|'), Variable('A'), SingularProposition(OperatorFactory.get_operator('~'), Variable('B'))),
+    prop = AndProposition(
+        OrProposition(Variable('A'), NotProposition(Variable('B'))),
         Variable('C')
     )
 
@@ -52,8 +47,8 @@ def test_predefined_truthtable():
     assert truthtable.get_hash() == "A2"
 
 # Simplifying
-prop = CompoundProposition(OperatorFactory.get_operator('|'),
-    CompoundProposition(OperatorFactory.get_operator('|'), Variable('A'), Variable('B')),
+prop = OrProposition(
+    OrProposition(Variable('A'), Variable('B')),
     Variable('C')
 )
 
