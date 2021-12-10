@@ -1,3 +1,5 @@
+from cnf_strategy import *
+
 class Operator:
     def ascii(self) -> str:
         raise NotImplementedError()
@@ -11,6 +13,9 @@ class Operator:
 class SingularOperator(Operator):
     def evaluate(self, a) -> bool:
         raise NotImplementedError()
+    
+    def get_cnf_strategy(self, debugger) -> SingularPropositionStrategy:
+        raise NotImplementedError()
 
 class CompoundOperator(Operator):
     def evaluate(self, a, b) -> bool:
@@ -22,6 +27,9 @@ class CompoundOperator(Operator):
         for i in range(1, len(props)):
             state = self.evaluate(state, props[i])
         return state
+
+    def get_cnf_strategy(self, debugger) -> CompoundPropositionStrategy:
+        raise NotImplementedError()
         
 class AndOperator(CompoundOperator):
     def ascii(self):
@@ -36,6 +44,9 @@ class AndOperator(CompoundOperator):
     def evaluate(self, a, b) -> bool:
         return a and b
 
+    def get_cnf_strategy(self, debugger):
+        return AndStrategy(debugger)
+
 class OrOperator(CompoundOperator):
     def ascii(self):
         return '|'
@@ -48,6 +59,9 @@ class OrOperator(CompoundOperator):
     
     def evaluate(self, a, b) -> bool:
         return a or b
+    
+    def get_cnf_strategy(self, debugger):
+        return OrStrategy(debugger)
 
 class ImplicationOperator(CompoundOperator):
     def ascii(self):
@@ -64,6 +78,9 @@ class ImplicationOperator(CompoundOperator):
     
     def evaluate_extended(self, _):
         raise NotImplementedError()
+    
+    def get_cnf_strategy(self, debugger):
+        return ImplicationStrategy(debugger)
 
 class BiimplicationOperator(CompoundOperator):
     def ascii(self):
@@ -81,6 +98,9 @@ class BiimplicationOperator(CompoundOperator):
     def evaluate_extended(self, _):
         raise NotImplementedError()
     
+    def get_cnf_strategy(self, debugger):
+        return BiimplicationStrategy(debugger)
+    
 class NotOperator(SingularOperator):
     def ascii(self):
         return '~'
@@ -96,3 +116,6 @@ class NotOperator(SingularOperator):
 
     def evaluate_extended(self, _):
         raise NotImplementedError()
+    
+    def get_cnf_strategy(self, debugger):
+        return NotStrategy(debugger)

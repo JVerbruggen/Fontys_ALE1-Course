@@ -180,84 +180,11 @@ class CompoundProposition(Proposition):
     def cnf(self,debugger=None):
         # Very not OOP, but if delegated to operator we would have circular import?
         operator_type = type(self.operator)
-        if operator_type is AndOperator:
-            pa_items = self.proposition_a.cnf(debugger).get_literals()
-            pb_items = self.proposition_b.cnf(debugger).get_literals()
-            res = ExtendedProposition(OperatorFactory[AndOperator], pa_items + pb_items)
-            if debugger is not None: 
-                debugger.trace(res.ascii())
-                debugger.analyse(res)
-            return res
-        elif operator_type is OrOperator:
-            # Something here is wrong
-            and_props = []
 
-            prop_a = self.proposition_a.cnf(debugger)
-            prop_b = self.proposition_b.cnf(debugger)
-
-            # all_literals = True
-            # subs = prop_a.get_sub_propositions() + prop_b.get_sub_propositions()
-            # for sub in subs:
-            #     all_literals = sub.is_literal()
-            #     if all_literals == False:
-            #         break
-
-            p_items = prop_a.get_literals()
-            q_items = prop_b.get_literals()
-
-            if debugger is not None:
-                debugger.analyse(self)
-                debugger.trace("OR1: " + str(prop_a.ascii()))
-                debugger.trace("OR2: " + str(prop_b.ascii()))
-                debugger.trace("LIT: " + str([x.ascii() for x in p_items + q_items]))
-                debugger.trace("OR2: " + str(prop_b.ascii()))
-
-
-            for p_item in p_items:
-                for q_item in q_items:
-                    and_props += [CompoundProposition(OperatorFactory[OrOperator], p_item, q_item)]
-
-            if len(and_props) == 1:
-                return and_props[0]
-
-            res = ExtendedProposition(OperatorFactory[AndOperator], and_props)
-            if debugger is not None: 
-                debugger.trace(res.ascii())
-                debugger.analyse(res)
-            return res
-        elif operator_type is ImplicationOperator:
-            res = CompoundProposition(OperatorFactory[OrOperator], 
-                SingularProposition(OperatorFactory[NotOperator], self.proposition_a).cnf(debugger), 
-                self.proposition_b.cnf(debugger)
-                )
-            # res_cnf = res.cnf(debugger)
-            if debugger is not None: 
-                debugger.trace(res.ascii())
-                debugger.analyse(res)
-                # debugger.trace(res_cnf.ascii())
-                # debugger.analyse(res_cnf)
-            return res
-            # return res_cnf
-        elif operator_type is BiimplicationOperator:
-            # res = CompoundProposition(OperatorFactory[OrOperator], 
-            #     CompoundProposition(OperatorFactory[AndOperator], self.proposition_a.cnf(debugger), self.proposition_b.cnf(debugger)), 
-            #     CompoundProposition(OperatorFactory[AndOperator], 
-            #         SingularProposition(OperatorFactory[NotOperator], self.proposition_a).cnf(debugger), 
-            #         SingularProposition(OperatorFactory[NotOperator], self.proposition_b).cnf(debugger)).cnf(debugger)
-            # )
-            res = CompoundProposition(OperatorFactory[AndOperator],
-                CompoundProposition(OperatorFactory[OrOperator], SingularProposition(OperatorFactory[NotOperator], self.proposition_a), self.proposition_b),
-                CompoundProposition(OperatorFactory[OrOperator], self.proposition_a, SingularProposition(OperatorFactory[NotOperator], self.proposition_b))
-            )
-            # res_cnf = res.cnf(debugger)
-            if debugger is not None: 
-                debugger.trace(res.ascii())
-                debugger.analyse(res)
-                # debugger.trace(res_cnf.ascii())
-                # debugger.analyse(res_cnf)
-            return res
-            # return res_cnf
-        raise Exception("Unsupported operator")
+        cnf_strategy = self.operator.get_cnf_strategy(debugger)
+        cnf_strategy.set_propositions(self.proposition_a, self.proposition_b)
+        res = cnf_strategy.get_result()
+        return res
 
     def __str__(self):
         return self.operator.ascii() + "(" + str(self.proposition_a) + "," + str(self.proposition_b) + ")"
