@@ -69,29 +69,32 @@ def test_get_variables_extended():
     assert MultiAnd([Variable('A'), Variable('A'), AndProposition(Variable('A'), Variable('A'))]).get_variables() == ['A']
 
 def test_cnf():
-    assert PropositionParser("~(P)").read().cnf().ascii() == "~(P)"
-    assert PropositionParser("~(~(P))").read().cnf().ascii() == "P"
-    assert PropositionParser("~(~(~(P)))").read().cnf().ascii() == "~(P)"
-    assert PropositionParser("~(~(~(~(P))))").read().cnf().ascii() == "P"
-    assert PropositionParser("~(&(P,Q))").read().cnf().ascii() == "|(~(P),~(Q))"
-    assert PropositionParser("~(|(P,Q))").read().cnf().ascii() == "&(~(P),~(Q))"
+    assert PropositionParser("~(P)").read().cnf().ascii_complex() == "~(P)"
+    assert PropositionParser("~(~(P))").read().cnf().ascii_complex() == "P"
+    assert PropositionParser("~(~(~(P)))").read().cnf().ascii_complex() == "~(P)"
+    assert PropositionParser("~(~(~(~(P))))").read().cnf().ascii_complex() == "P"
+    assert PropositionParser("~(&(P,Q))").read().cnf().ascii_complex() == "*&([*|([~(P),~(Q)])])"
+    assert PropositionParser("~(|(P,Q))").read().cnf().ascii_complex() == "*&([~(P),~(Q)])"
 
-    assert PropositionParser("|(P,Q)").read().cnf().ascii() == "|(P,Q)"
-    assert PropositionParser("|(|(P,Q),R)").read().cnf().ascii() == "&(|(P,R),|(Q,R))"
-    assert PropositionParser("|(|(P,Q),|(R,S))").read().cnf().ascii() == "&(|(P,R),&(|(P,S),&(|(Q,R),|(Q,S))))"
+    assert PropositionParser("|(P,Q)").read().cnf().ascii_complex() == "*&([*|([P,Q])])"
+    assert PropositionParser("|(|(P,Q),R)").read().cnf().ascii_complex() == "*&([*|([P,Q,R])])"
+    assert PropositionParser("|(|(P,Q),|(R,S))").read().cnf().ascii_complex() == "*&([*|([P,Q,R,S])])"
     
-    assert PropositionParser(">(P,Q)").read().cnf().ascii() == "|(~(P),Q)"
-    assert PropositionParser(">(~(P),Q)").read().cnf().ascii() == "|(P,Q)"
-    assert PropositionParser(">(P,~(Q))").read().cnf().ascii() == "|(~(P),~(Q))"
-    assert PropositionParser(">(~(P),~(Q))").read().cnf().ascii() == "|(P,~(Q))"
+    assert PropositionParser(">(P,Q)").read().cnf().ascii_complex() == "*&([*|([~(P),Q])])"
+    assert PropositionParser(">(~(P),Q)").read().cnf().ascii_complex() == "*&([*|([P,Q])])"
+    assert PropositionParser(">(P,~(Q))").read().cnf().ascii_complex() == "*&([*|([~(P),~(Q)])])"
+    assert PropositionParser(">(~(P),~(Q))").read().cnf().ascii_complex() == "*&([*|([P,~(Q)])])"
 
-    assert PropositionParser("=(P,Q)").read().cnf().ascii() == "&(|(~(P),Q),|(P,~(Q)))"
-    assert PropositionParser("=(&(A,C),B)").read().cnf().ascii() == "&(|(~(&(A,C)),B),|(&(A,C),~(B)))"
+    assert PropositionParser("=(P,Q)").read().cnf().ascii_complex() == "*&([*|([P,~(Q)]),*|([Q,~(P)])])"
+    assert PropositionParser("=(&(A,C),B)").read().cnf().ascii_complex() == "*&([*|([A,~(B)]),*|([C,~(B)]),*|([B,~(A),~(C)])])"
     # assert PropositionParser("=(=(A,C),B)").read().cnf().ascii() == ""
+
+    assert PropositionParser("=(&(A,C),B)").read().cnf().cnf_notation() == "[ Ab , Cb , Bac ]"
+    assert PropositionParser("=(P,Q)").read().cnf().cnf_notation() == "[ Pq , Qp ]"
 
 def test_get_literals():
     assert [lit.ascii() for lit in PropositionParser("&(P,~(Q))").read().get_literals()] == ['P', '~(Q)']
-    assert [lit.ascii() for lit in PropositionParser("|(~(&(A,C)),B)").read().get_literals()] == ['P', '~(Q)']
+    assert [lit.ascii() for lit in PropositionParser("|(~(&(A,C)),B)").read().get_literals()] == ['A', 'C', 'B']
 
 def test_cnf_notation():
     pass

@@ -10,3 +10,13 @@ class Debugger:
     def trace(self, msg):
         if self.trace_function is not None:
             self.trace_function(msg)
+
+class NoDebug(Debugger):
+    def __init__(self):
+        pass
+
+    def analyse(self, instance):
+        pass
+
+    def trace(self, msg):
+        pass

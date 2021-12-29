@@ -1,4 +1,5 @@
 from debugger import *
+from ascii_inflictor import *
 
 class Proposition:
     def ascii_operator(self):
@@ -10,8 +11,11 @@ class Proposition:
     def evaluate(self, state):
         raise NotImplementedError()
 
-    def ascii(self) -> str:
+    def ascii(self, ascii_func=AsciiInflictor.ascii_normal) -> str:
         raise NotImplementedError()
+
+    def ascii_complex(self) -> str:
+        return self.ascii(ascii_func=AsciiInflictor.ascii_complex)
 
     def infix(self) -> str:
         raise NotImplementedError()
@@ -25,8 +29,32 @@ class Proposition:
     def get_sub_propositions(self) -> list['Proposition']:
         raise NotImplementedError()
 
-    def cnf(self, debugger=None) -> 'Proposition':
+    def cnf_inner(self, debugger: Debugger=NoDebug()) -> 'Proposition':
         raise NotImplementedError()
+
+    def cnf(self, debugger: Debugger=NoDebug()) -> 'Proposition':
+        debugger.trace("start with: " + self.ascii_complex())
+        debugger.analyse(self)
+
+        res = self.cnf_inner(debugger=debugger)
+        debugger.trace("before contradiction removal: " + res.ascii_complex())
+        debugger.analyse(res)
+
+        res = res.remove_contradictions()
+
+        debugger.trace("after contradiction removal: " + res.ascii_complex())
+        debugger.analyse(res)
+
+        return res
+
+    def cnf_notation(self) -> str:
+        raise ValueError("This proposition type is not a CNF root")
+
+    def remove_contradictions(self, debugger: Debugger=NoDebug()):
+        return self
+
+    def is_always_true_or_false(self, debugger: Debugger=NoDebug()) -> bool:
+        return False
 
     def concat_sub_propositions(self, other: 'Proposition') -> list['Proposition']:
         return self.get_literals() + other.get_literals()
@@ -34,12 +62,15 @@ class Proposition:
     def is_literal(self):
         raise NotImplementedError()
 
+    def cnf_notation(self):
+        raise NotImplementedError()
+
 class Variable(Proposition):
     def __init__(self, value: str):
         super().__init__()
         self.value = value
     
-    def ascii(self):
+    def ascii(self, ascii_func=AsciiInflictor.ascii_normal):
         return self.value
 
     def infix(self):
@@ -59,7 +90,7 @@ class Variable(Proposition):
             return state[self.value]
         return False
 
-    def cnf(self,debugger=None):
+    def cnf_inner(self,debugger=NoDebug()):
         return Variable(self.value)
 
     def __str__(self):
@@ -88,22 +119,28 @@ class ExtendedProposition(Proposition):
 
         return CompoundProposition(take, self.get_rational_equivalent(to_process))
     
-    def ascii(self):
+    def ascii(self, ascii_func=AsciiInflictor.ascii_normal):
         closing_brackets = 1
 
         operator_ascii = self.ascii_operator()
-        ascii_string = operator_ascii + "(" + self.propositions[0].ascii() + ","
+        ascii_string = operator_ascii + "(" + ascii_func(self.propositions[0]) + ","
         for i in range(1,len(self.propositions)-1):
             prop = self.propositions[i]
 
-            ascii_string += operator_ascii + "(" + prop.ascii() + ","
+            ascii_string += operator_ascii + "(" + ascii_func(prop) + ","
 
             closing_brackets += 1
         
-        ascii_string += self.propositions[-1].ascii()
+        ascii_string += ascii_func(self.propositions[-1])
 
         ascii_string += ''.join(')' for _ in range(closing_brackets))
 
+        return ascii_string
+
+    def ascii_complex(self):
+        operator_ascii = self.ascii_operator()
+        ascii_string = '*' + operator_ascii + "([" + ",".join([prop.ascii_complex() for prop in self.propositions]) + "])"
+        
         return ascii_string
     
     def infix(self):
@@ -116,12 +153,12 @@ class ExtendedProposition(Proposition):
         return sorted(variables)
 
     def get_literals(self):
-        return [self.propositions[:]]
+        return self.propositions[:]
 
     def get_sub_propositions(self):
         return self.propositions[:]
 
-    # def cnf(self,debugger=None):
+    # def cnf(self,debugger=NoDebug()):
     #     if debugger is not None: debugger.analyse(self)
     #     return self.get_rational_equivalent().cnf(debugger)
     #     # raise Exception("CNF not available for extended proposition")
@@ -146,10 +183,22 @@ class MultiAnd(ExtendedProposition):
             res = res and self.propositions[i].evaluate(state)
         return res
     
-    def cnf(self,debugger=None):
+    def cnf_inner(self,debugger=NoDebug()):
         props = self.get_sub_propositions()
-        props = [p.cnf(debugger) for p in props]
+        props = [p.cnf_inner(debugger) for p in props]
         return MultiAnd(props)
+
+    def cnf_notation(self):
+        raise NotImplementedError()
+
+    def remove_contradictions(self, debugger: Debugger=NoDebug()):
+        return MultiAnd([p for p in self.propositions if p.is_always_true_or_false() == False])
+    
+    def absorb(self, other: 'MultiAnd'):
+        return MultiAnd(self.propositions + other.propositions)
+
+    def cnf_notation(self):
+        return "[ " + " , ".join([prop.cnf_notation() for prop in self.propositions]) + " ]"
 
 class MultiOr(ExtendedProposition):
     def ascii_operator(self):
@@ -165,10 +214,54 @@ class MultiOr(ExtendedProposition):
             res = res or self.propositions[i].evaluate(state)
         return res
     
-    def cnf(self,debugger=None):
+    def cnf_inner(self,debugger=NoDebug()):
+        # props = self.get_sub_propositions()
+        # props = [p.cnf_inner(debugger) for p in props]
+        # return MultiOr(props)
+
         props = self.get_sub_propositions()
-        props = [p.cnf(debugger) for p in props]
-        return MultiOr(props)
+        if len(props != 2):
+            raise NotImplementedError()
+
+        return OrProposition(props[0], prop[1]).cnf_inner(debugger)
+
+    def is_always_true_or_false(self, debugger: Debugger=NoDebug()) -> bool:
+        always_same = False
+
+        for i in range(len(self.propositions)):
+            pi = self.propositions[i]
+            if pi.is_literal():
+                for j in range(i+1, len(self.propositions)):
+                    pj = self.propositions[j]
+                    if pj.is_literal():
+                        always_same_here = (
+                            (type(pi) is NotProposition and type(pj) is Variable
+                                and type(pi.get_sub_propositions()[0]) is Variable
+                                and pi.get_sub_propositions()[0].value==pj.value
+                            ) 
+                            or 
+                            (type(pi) is Variable and type(pj) is NotProposition
+                                and type(pj.get_sub_propositions()[0]) is Variable
+                                and pi.value==pj.get_sub_propositions()[0].value
+                            )) 
+                        if always_same_here:
+                            always_same = True
+                            break
+
+        return always_same
+    
+    def cnf_notation(self):
+        notation = ""
+
+        for prop in self.propositions:
+            if type(prop) is Variable:
+                notation += prop.value.upper()
+            elif type(prop) is NotProposition and type(prop.proposition_a) is Variable:
+                notation += prop.proposition_a.value.lower()
+            else:
+                raise ValueError(f"CNF format is not correct. Expected variable or not(variable), but got {prop}")
+        
+        return notation
 
 class CompoundProposition(Proposition):
     def __init__(self, proposition_a: Proposition = None, proposition_b: Proposition = None):
@@ -176,10 +269,10 @@ class CompoundProposition(Proposition):
         self.proposition_a = proposition_a
         self.proposition_b = proposition_b
 
-    def ascii(self):
+    def ascii(self, ascii_func=AsciiInflictor.ascii_normal):
         if self.proposition_a == None or self.proposition_b == None:
             return self.ascii_operator() + "(incomplete proposition)"
-        return self.ascii_operator() + "(" + self.proposition_a.ascii() + "," + self.proposition_b.ascii() + ")"
+        return self.ascii_operator() + "(" + ascii_func(self.proposition_a) + "," + ascii_func(self.proposition_b) + ")"
     
     def infix(self):
         return "(" + self.proposition_a.infix() + " " + self.infix_operator() + " " + self.proposition_b.infix() + ")"
@@ -213,16 +306,29 @@ class AndProposition(CompoundProposition):
     def evaluate(self, state):
         return self.proposition_a.evaluate(state) and self.proposition_b.evaluate(state)
     
-    def cnf(self,debugger=None):
+    def cnf_inner(self,debugger=NoDebug()):
         if self.proposition_a == None or self.proposition_b == None:
             raise ValueError("Propositions in strategies not defined")
 
-        return self
-        # pa_items = self.proposition_a.cnf(debugger).get_literals()
-        # pb_items = self.proposition_b.cnf(debugger).get_literals()
+        pa = self.proposition_a.cnf_inner(debugger)
+        pb = self.proposition_b.cnf_inner(debugger)
+
+        and_props = list()
+        for prop in [pa, pb]:                   # merge child ands into itself
+            if type(prop) is AndProposition:
+                and_props += [prop.proposition_a, prop.proposition_b]
+            elif type(prop) is MultiAnd:
+                and_props += prop.propositions
+            else:
+                and_props += [prop]
+
+
+        return MultiAnd(and_props)
+        # pa_items = self.proposition_a.cnf_inner(debugger).get_literals()
+        # pb_items = self.proposition_b.cnf_inner(debugger).get_literals()
         # res = MultiAnd(pa_items + pb_items)
         # if debugger is not None: 
-        #     debugger.trace(res.ascii())
+        #     debugger.trace(res.ascii_complex())
         #     debugger.analyse(res)
         # return res
 
@@ -237,36 +343,68 @@ class OrProposition(CompoundProposition):
         return self.proposition_a.evaluate(state) or self.proposition_b.evaluate(state)
 
 
-    def cnf(self,debugger=None):
+    def cnf_inner(self,debugger=NoDebug()):
         and_props = []
 
-        prop_a = self.proposition_a.cnf(debugger)
-        prop_b = self.proposition_b.cnf(debugger)
+        prop_a = self.proposition_a.cnf_inner(debugger)
+        prop_b = self.proposition_b.cnf_inner(debugger)
+
+        if type(prop_a) is not AndProposition and type(prop_a) is not MultiAnd and prop_a.is_literal() == False:
+            raise ValueError(f"Expected AndProposition, MultiAnd or literal at prop_a 'or' CNF but got: {type(prop_a)} ({prop_a})")
+        if type(prop_b) is not AndProposition and type(prop_b) is not MultiAnd and prop_b.is_literal() == False:
+            raise ValueError(f"Expected AndProposition, MultiAnd or literal at prop_b 'or' CNF but got: {type(prop_b)} ({prop_b})")
 
         p_items = prop_a.get_literals()
         q_items = prop_b.get_literals()
 
         if debugger is not None:
             debugger.analyse(self)
-            debugger.trace("OR1: " + str(prop_a.ascii()))
-            debugger.trace("OR2: " + str(prop_b.ascii()))
-            debugger.trace("LIT: " + str([x.ascii() for x in p_items + q_items]))
-            debugger.trace("OR2: " + str(prop_b.ascii()))
+            debugger.trace("OR1: " + str(prop_a.ascii_complex()))
+            debugger.trace("OR2: " + str(prop_b.ascii_complex()))
+            # debugger.trace("LIT: " + str([x.ascii_complex() for x in p_items + q_items]))
+            debugger.trace("OR2: " + str(prop_b.ascii_complex()))
 
 
         for p_item in p_items:
             for q_item in q_items:
-                and_props += [OrProposition( p_item, q_item)]
+                adding = []
 
-        if len(and_props) == 1:
-            return and_props[0]
+                for item in [p_item, q_item]:
+                    if item.is_literal():
+                        adding += [item]
+                    elif type(item) is OrProposition or type(item) is MultiOr:
+                        adding += item.get_sub_propositions()
+                
+
+                and_props += [MultiOr(adding)]
+
+        # if len(and_props) == 1:
+        #     return and_props[0]
 
         res = MultiAnd(and_props)
         # Dont CNF this, only CNF its children
         if debugger is not None: 
-            debugger.trace(res.ascii())
+            debugger.trace(res.ascii_complex())
             debugger.analyse(res)
         return res
+    
+    def is_always_true_or_false(self, debugger: Debugger=NoDebug()) -> bool:
+        pi = self.proposition_a
+        pj = self.proposition_b
+        always_same = (
+                    (type(pi) is NotProposition and type(pj) is Variable
+                        and type(pi.get_sub_propositions()[0]) is Variable
+                        and pi.get_sub_propositions()[0].value==pj.value
+                    ) 
+                    or 
+                    (type(pi) is Variable and type(pj) is NotProposition
+                        and type(pj.get_sub_propositions()[0]) is Variable
+                        and pi.value==pj.get_sub_propositions()[0].value
+                    )) 
+
+        debugger.trace(f"Always same: {always_same} -> ({pi},{pj})")
+
+        return always_same
 
 class ImplicationProposition(CompoundProposition):
     def ascii_operator(self):
@@ -279,15 +417,15 @@ class ImplicationProposition(CompoundProposition):
         pa_evaluated = self.proposition_a.evaluate(state)
         return not pa_evaluated or (pa_evaluated and self.proposition_b.evaluate(state))
     
-    def cnf(self,debugger=None):
+    def cnf_inner(self,debugger=NoDebug()):
         res = OrProposition(NotProposition(self.proposition_a), 
             self.proposition_b
             )
-        res_cnf = res.cnf(debugger)
+        res_cnf = res.cnf_inner(debugger)
         if debugger is not None: 
-            debugger.trace(res.ascii())
+            debugger.trace(res.ascii_complex())
             debugger.analyse(res)
-            debugger.trace(res_cnf.ascii())
+            debugger.trace(res_cnf.ascii_complex())
             debugger.analyse(res_cnf)
         # return res
         return res_cnf
@@ -302,31 +440,48 @@ class BiimplicationProposition(CompoundProposition):
     def evaluate(self, state):
         return self.proposition_a.evaluate(state) == self.proposition_b.evaluate(state)
     
-    def cnf(self,debugger=None):
-        prop_a_cnfed = self.proposition_a.cnf(debugger)
-        prop_b_cnfed = self.proposition_b.cnf(debugger)
+    # def cnf_inner(self,debugger=NoDebug()):
+    #     prop_a_cnfed = self.proposition_a.cnf_inner(debugger)
+    #     prop_b_cnfed = self.proposition_b.cnf_inner(debugger)
 
-        res = AndProposition(
-            OrProposition(NotProposition(prop_a_cnfed).cnf(debugger), prop_b_cnfed),
-            OrProposition(prop_a_cnfed, NotProposition(prop_b_cnfed).cnf(debugger))
+    #     res = AndProposition(
+    #         OrProposition(NotProposition(prop_a_cnfed).cnf_inner(debugger), prop_b_cnfed),
+    #         OrProposition(prop_a_cnfed, NotProposition(prop_b_cnfed).cnf_inner(debugger))
+    #     )
+    #     res_cnf = res.cnf_inner(debugger)
+    #     if debugger is not None: 
+    #         debugger.trace(res.ascii_complex())
+    #         debugger.analyse(res)
+    #         debugger.trace(res_cnf.ascii_complex())
+    #         debugger.analyse(res_cnf)
+    #     return res_cnf
+
+    def cnf_inner(self,debugger=NoDebug()):
+        reformat = OrProposition(
+            AndProposition(
+                self.proposition_a,
+                self.proposition_b
+            ),
+            AndProposition(
+                NotProposition(self.proposition_a),
+                NotProposition(self.proposition_b)
+            )
         )
-        res_cnf = res.cnf(debugger)
+        res = reformat.cnf_inner(debugger)
         if debugger is not None: 
-            debugger.trace(res.ascii())
+            debugger.trace(res.ascii_complex())
             debugger.analyse(res)
-            debugger.trace(res_cnf.ascii())
-            debugger.analyse(res_cnf)
-        return res_cnf
+        return res
 
 class SingularProposition(Proposition):
     def __init__(self, proposition_a: Proposition = None):
         super().__init__()
         self.proposition_a = proposition_a
 
-    def ascii(self):
+    def ascii(self, ascii_func=AsciiInflictor.ascii_normal):
         if self.proposition_a == None:
             return self.ascii_operator() + "(incomplete proposition)"
-        return self.ascii_operator() + "(" + self.proposition_a.ascii() + ")"
+        return self.ascii_operator() + "(" + ascii_func(self.proposition_a) + ")"
 
     def infix(self):
         return self.infix_operator() + self.proposition_a.infix()
@@ -343,7 +498,7 @@ class SingularProposition(Proposition):
         return self.ascii_operator() + "(" + str(self.proposition_a) + ")"
 
     def is_literal(self):
-        return self.proposition_a.is_literal() # ~(A) is also a literal
+        return type(self.proposition_a) is Variable
 
 class NotProposition(SingularProposition):
     def ascii_operator(self):
@@ -355,13 +510,13 @@ class NotProposition(SingularProposition):
     def evaluate(self, state):
         return not self.proposition_a.evaluate(state)
     
-    def cnf(self,debugger=None):
+    def cnf_inner(self,debugger=NoDebug()):
         # Very not OOP, but if delegated to operator we would have circular import?
         pa_type = type(self.proposition_a)
         if pa_type is Variable:
             return self
         elif issubclass(pa_type, SingularProposition):
-            return self.proposition_a.proposition_a.cnf(debugger)
+            return self.proposition_a.proposition_a.cnf_inner(debugger)
         elif issubclass(pa_type, CompoundProposition):
             if pa_type is AndProposition:
                 pa = self.proposition_a.proposition_a
@@ -370,12 +525,11 @@ class NotProposition(SingularProposition):
                     NotProposition(pa),
                     NotProposition(pb)
                     )
-                res_cnf = res.cnf(debugger)
-                if debugger is not None: 
-                    debugger.trace(res.ascii())
-                    debugger.analyse(res)
-                    debugger.trace(res_cnf.ascii())
-                    debugger.analyse(res_cnf)
+                res_cnf = res.cnf_inner(debugger)
+                debugger.trace("in NOT (and): " + res.ascii_complex())
+                debugger.analyse(res)
+                debugger.trace("in NOT after (and): " + res_cnf.ascii_complex())
+                debugger.analyse(res_cnf)
                 return res_cnf
             elif pa_type is OrProposition:
                 pa = self.proposition_a.proposition_a
@@ -384,12 +538,11 @@ class NotProposition(SingularProposition):
                     NotProposition(pa),
                     NotProposition(pb)
                     )
-                res_cnf = res.cnf(debugger)
-                if debugger is not None: 
-                    debugger.trace(res.ascii())
-                    debugger.analyse(res)
-                    debugger.trace(res_cnf.ascii())
-                    debugger.analyse(res_cnf)
+                res_cnf = res.cnf_inner(debugger)
+                debugger.trace("in NOT (or): " + res.ascii_complex())
+                debugger.analyse(res)
+                debugger.trace("in NOT after (or): " + res_cnf.ascii_complex())
+                debugger.analyse(res_cnf)
                 return res_cnf
             # else:
             #     return NotProposition(self.proposition_a.cnf(debugger)).cnf(debugger)
@@ -401,9 +554,9 @@ class NotProposition(SingularProposition):
             res_cnf = res.cnf()
 
             if debugger is not None: 
-                debugger.trace(res.ascii())
+                debugger.trace("in NOT (extended): " + res.ascii_complex())
                 debugger.analyse(res)
-                debugger.trace(res_cnf.ascii())
+                debugger.trace("in NOT after (extended): " + res_cnf.ascii_complex())
                 debugger.analyse(res_cnf)
             
             return res_cnf
@@ -414,4 +567,5 @@ class NotProposition(SingularProposition):
             return [self]
         elif type(self.proposition_a) is NotProposition:
             return self.proposition_a.proposition_a.get_literals()
-        raise NotImplementedError()
+        else:
+            return self.proposition_a.get_literals()
