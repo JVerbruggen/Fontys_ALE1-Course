@@ -37,6 +37,9 @@ class Proposition:
         debugger.analyse(self)
 
         res = self.cnf_inner(debugger=debugger)
+        if type(res) is not MultiAnd:
+            res = MultiAnd([res])
+
         debugger.trace("before contradiction removal: " + res.ascii_complex())
         debugger.analyse(res)
 
@@ -185,8 +188,29 @@ class MultiAnd(ExtendedProposition):
     
     def cnf_inner(self,debugger=NoDebug()):
         props = self.get_sub_propositions()
-        props = [p.cnf_inner(debugger) for p in props]
-        return MultiAnd(props)
+        and_props = []
+
+        for prop in props:
+            cnf_prop = prop.cnf_inner(debugger)
+            if type(cnf_prop) is AndProposition:
+                and_props += [cnf_prop.proposition_a, cnf_prop.proposition_b]
+            elif type(cnf_prop) is MultiAnd:
+                and_props += cnf_prop.get_sub_propositions()
+            else:
+                and_props += [cnf_prop]
+
+        return MultiAnd(and_props)
+
+        # and_props = list()
+        # for prop in [pa, pb]:                   # merge child ands into itself
+        #     if type(prop) is AndProposition:
+        #         and_props += [prop.proposition_a, prop.proposition_b]
+        #     elif type(prop) is MultiAnd:
+        #         and_props += prop.propositions
+        #     else:
+        #         and_props += [prop]
+
+        # return MultiAnd(props)
 
     def cnf_notation(self):
         raise NotImplementedError()
@@ -215,9 +239,38 @@ class MultiOr(ExtendedProposition):
         return res
     
     def cnf_inner(self,debugger=NoDebug()):
-        props = self.get_sub_propositions()
-        props = [p.cnf_inner(debugger) for p in props]
-        return MultiOr(props)
+        debugger.analyse(self)
+
+        props = [p.cnf_inner(debugger) for p in self.get_sub_propositions()]
+        merged_props = []
+
+        debugger.trace(f"Props MultiOr: { ','.join([str(p) for p in props])}")
+
+        for prop in props:
+            if type(prop) == MultiOr or type(prop) == OrProposition:
+                subs = [s.cnf_inner(debugger) for s in prop.get_sub_propositions()]
+                merged_props += subs
+                # merged_props += prop.get_sub_propositions()
+            else:
+                merged_props += [prop]
+
+        if type(merged_props[0]) == MultiAnd or type(merged_props[1]) == MultiAnd:
+            if len(merged_props) > 2:
+                raise ValueError(f"Cant merge more than two ands in a MultiOr\n"
+                    + f"Got: { ';'.join([str(p) for p in merged_props])}")
+
+            dim_1 = merged_props[0].get_sub_propositions()
+            dim_2 = merged_props[1].get_sub_propositions()
+
+            and_processed_props = []
+
+            for x in dim_1:
+                for y in dim_2:
+                    and_processed_props += [MultiOr([x, y]).cnf_inner(debugger)]
+            
+            return MultiAnd(and_processed_props)
+
+        return MultiOr(merged_props)
 
         # props = self.get_sub_propositions()
         # if len(props) != 2:
@@ -310,6 +363,8 @@ class AndProposition(CompoundProposition):
         if self.proposition_a == None or self.proposition_b == None:
             raise ValueError("Propositions in strategies not defined")
 
+        return MultiAnd([self.proposition_a, self.proposition_b]).cnf_inner(debugger)
+
         pa = self.proposition_a.cnf_inner(debugger)
         pb = self.proposition_b.cnf_inner(debugger)
 
@@ -344,6 +399,9 @@ class OrProposition(CompoundProposition):
 
 
     def cnf_inner(self,debugger=NoDebug()):
+
+        return MultiOr([self.proposition_a, self.proposition_b]).cnf_inner(debugger)
+
         and_props = []
 
         prop_a = self.proposition_a.cnf_inner(debugger)
@@ -372,7 +430,10 @@ class OrProposition(CompoundProposition):
                     if item.is_literal():
                         adding += [item]
                     elif type(item) is OrProposition or type(item) is MultiOr:
-                        adding += item.get_sub_propositions()
+                        subs = [s.cnf_inner(debugger) for s in item.get_sub_propositions()]
+
+
+                        adding += subs
                 
 
                 and_props += [MultiOr(adding)]
