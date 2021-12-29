@@ -215,15 +215,15 @@ class MultiOr(ExtendedProposition):
         return res
     
     def cnf_inner(self,debugger=NoDebug()):
-        # props = self.get_sub_propositions()
-        # props = [p.cnf_inner(debugger) for p in props]
-        # return MultiOr(props)
-
         props = self.get_sub_propositions()
-        if len(props != 2):
-            raise NotImplementedError()
+        props = [p.cnf_inner(debugger) for p in props]
+        return MultiOr(props)
 
-        return OrProposition(props[0], prop[1]).cnf_inner(debugger)
+        # props = self.get_sub_propositions()
+        # if len(props) != 2:
+        #     raise NotImplementedError()
+
+        # return OrProposition(props[0], prop[1]).cnf_inner(debugger)
 
     def is_always_true_or_false(self, debugger: Debugger=NoDebug()) -> bool:
         always_same = False
@@ -362,7 +362,6 @@ class OrProposition(CompoundProposition):
             debugger.trace("OR1: " + str(prop_a.ascii_complex()))
             debugger.trace("OR2: " + str(prop_b.ascii_complex()))
             # debugger.trace("LIT: " + str([x.ascii_complex() for x in p_items + q_items]))
-            debugger.trace("OR2: " + str(prop_b.ascii_complex()))
 
 
         for p_item in p_items:
@@ -439,22 +438,6 @@ class BiimplicationProposition(CompoundProposition):
     
     def evaluate(self, state):
         return self.proposition_a.evaluate(state) == self.proposition_b.evaluate(state)
-    
-    # def cnf_inner(self,debugger=NoDebug()):
-    #     prop_a_cnfed = self.proposition_a.cnf_inner(debugger)
-    #     prop_b_cnfed = self.proposition_b.cnf_inner(debugger)
-
-    #     res = AndProposition(
-    #         OrProposition(NotProposition(prop_a_cnfed).cnf_inner(debugger), prop_b_cnfed),
-    #         OrProposition(prop_a_cnfed, NotProposition(prop_b_cnfed).cnf_inner(debugger))
-    #     )
-    #     res_cnf = res.cnf_inner(debugger)
-    #     if debugger is not None: 
-    #         debugger.trace(res.ascii_complex())
-    #         debugger.analyse(res)
-    #         debugger.trace(res_cnf.ascii_complex())
-    #         debugger.analyse(res_cnf)
-    #     return res_cnf
 
     def cnf_inner(self,debugger=NoDebug()):
         reformat = OrProposition(
@@ -544,8 +527,8 @@ class NotProposition(SingularProposition):
                 debugger.trace("in NOT after (or): " + res_cnf.ascii_complex())
                 debugger.analyse(res_cnf)
                 return res_cnf
-            # else:
-            #     return NotProposition(self.proposition_a.cnf(debugger)).cnf(debugger)
+            else:
+                return NotProposition(self.proposition_a.cnf_inner(debugger)).cnf_inner(debugger)
             raise Exception("Unsupported operator")
         elif issubclass(pa_type, ExtendedProposition): 
             old_props = self.proposition_a.get_sub_propositions()
