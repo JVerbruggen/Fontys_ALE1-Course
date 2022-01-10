@@ -93,5 +93,73 @@ class PropositionParser:
 
         return self.final_proposition
 
+class PropositionCNFFormatParser:
+    def __init__(self, cnf_format_string: str):
+        self.error = False
+        self.proposition_stack = []
+        self.cnf_props = []
+        self.expecting = "[e]"
+        self.characters = [c for c in cnf_format_string]
+        self.var_dict = dict()
+
+    def get_var(self, var_name: str) -> Variable:
+        if var_name in self.var_dict:
+            return self.var_dict[var_name]
+        elif var_name.upper() in self.var_dict:
+            return NotProposition(self.var_dict[var_name.upper()])
+        else:
+            var = Variable(var_name.upper())
+            self.var_dict[var_name.upper()] = var
+            if var_name.isupper():
+                return var
+            else:
+                return NotProposition(var)
+
+    def raise_error(self, error: str):
+        self.error = True
+        raise ValueError(error)
+
+    def process_prop_stack(self):
+        if len(self.proposition_stack) == 1:
+            self.cnf_props += self.proposition_stack
+        elif len(self.proposition_stack) > 1:
+            self.cnf_props += [MultiOr(self.proposition_stack)]
+
+        self.proposition_stack = []
+
+    def read(self) -> Proposition:
+        for c in self.characters:
+            if c == ' ':
+                continue
+            elif self.expecting[0] == '[':
+                if c == "[":
+                    self.expecting = self.expecting[1:]
+                    continue
+                else:
+                    self.raise_error(f"Expected [ but got '{c}'")
+            elif self.expecting[0] == ']':
+                if c == ",":
+                    self.expecting = "e]"
+                elif c == "]":
+                    self.expecting = self.expecting[1:]
+                else:
+                    self.raise_error(f"Expected ] but got '{c}'")
+
+                self.process_prop_stack()
+
+                continue
+            elif self.expecting[0] == "e":
+                if c.isalpha():
+                    self.proposition_stack += [self.get_var(c)]
+                elif c == "," or c == "]":
+                    self.process_prop_stack()
+                    continue
+                else:
+                    self.raise_error(f"Expected e but got '{c}'")
+            else:
+                self.raise_error(f"Unknown expected value {self.expecting[0]}")
+                break
+    
+        return MultiAnd(self.cnf_props)
 
             

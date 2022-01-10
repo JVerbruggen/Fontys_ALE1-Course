@@ -42,3 +42,16 @@ def test_equality_tester():
     assert EqualityTester.test_cnf("=(&(A,C),B)")
     assert EqualityTester.test_cnf("=(=(A,C),B)")
 
+    # CNF notation
+    assert EqualityTester.test_equal_ascii(
+        PropositionCNFFormatParser("[ E , Abc , AdC , BDa , Bca , CDa ]").read().ascii(), 
+        PropositionParser("&(E,=(A,|(&(B,C),&(D,~(C)))))").read().cnf().ascii())
+    assert EqualityTester.test_equal_ascii(
+        PropositionCNFFormatParser("[ Pqr , Qp , Rp ]").read().ascii(), 
+        PropositionParser("=(P,&(Q,R))").read().cnf().ascii())
+    assert EqualityTester.test_equal_ascii(
+        PropositionCNFFormatParser("[ Pq , Pr , QRp ]").read().ascii(), 
+        PropositionParser("=(P,|(Q,R))").read().cnf().ascii())
+
+
+

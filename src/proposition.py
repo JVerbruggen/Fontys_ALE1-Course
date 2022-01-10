@@ -93,6 +93,9 @@ class Variable(Proposition):
     def cnf_inner(self,debugger=NoDebug()):
         return Variable(self.value)
 
+    def cnf_notation(self):
+        return self.value
+
     def __str__(self):
         return self.value
 
