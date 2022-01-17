@@ -26,23 +26,72 @@ class Proposition:
     def get_literals(self) -> list['Proposition']:
         raise NotImplementedError()
 
+    def get_proper_literals(self) -> list['Proposition']:
+        raise NotImplementedError()
+
     def get_sub_propositions(self) -> list['Proposition']:
         raise NotImplementedError()
+
+    def remove_biimpl(self, debugger: Debugger=NoDebug()) -> 'Proposition':
+        raise NotImplementedError(repr(self))
+
+    def remove_impl(self, debugger: Debugger=NoDebug()) -> 'Proposition':
+        raise NotImplementedError(repr(self))
+
+    def remove_nots(self, debugger: Debugger=NoDebug()) -> 'Proposition':
+        raise NotImplementedError(repr(self))
+
+    def distribute_elements(self, debugger: Debugger=NoDebug()) -> 'Proposition':
+        raise NotImplementedError(repr(self))
+
+    def merge_ors(self, debugger: Debugger=NoDebug()) -> 'Proposition':
+        raise NotImplementedError(repr(self))
 
     def cnf_inner(self, debugger: Debugger=NoDebug()) -> 'Proposition':
         raise NotImplementedError()
 
-    def cnf(self, debugger: Debugger=NoDebug()) -> 'Proposition':
-        debugger.trace("start with: " + self.ascii_complex())
-        debugger.analyse(self)
+    # def cnf(self, debugger: Debugger=NoDebug()) -> 'Proposition':
+    #     debugger.trace("start with: " + self.ascii_complex())
+    #     debugger.analyse(self)
 
-        res = self.cnf_inner(debugger=debugger)
-        debugger.trace("before contradiction removal: " + res.ascii_complex())
+    #     res = self.cnf_inner(debugger=debugger)
+    #     debugger.trace("before contradiction removal: " + res.ascii_complex())
+    #     debugger.analyse(res)
+
+    #     res = res.remove_contradictions()
+
+    #     debugger.trace("after contradiction removal: " + res.ascii_complex())
+    #     debugger.analyse(res)
+
+    #     return res
+
+    def cnf(self, debugger: Debugger=NoDebug()) -> 'Proposition':
+        res = self
+        debugger.trace("start with: " + res.ascii_complex())
+        debugger.analyse(res)
+
+        res = res.remove_biimpl(debugger)
+        debugger.trace("removed biimpl: " + res.ascii_complex())
+        debugger.analyse(res)
+
+        res = res.remove_impl(debugger)
+        debugger.trace("removed impl: " + res.ascii_complex())
+        debugger.analyse(res)
+
+        res = res.remove_nots(debugger)
+        debugger.trace("removed nots: " + res.ascii_complex())
+        debugger.analyse(res)
+
+        res = res.distribute_elements(debugger)
+        debugger.trace("after distribution: " + res.ascii_complex())
+        debugger.analyse(res)
+
+        res = res.merge_ors()
+        debugger.trace("merged ors: " + res.ascii_complex())
         debugger.analyse(res)
 
         res = res.remove_contradictions()
-
-        debugger.trace("after contradiction removal: " + res.ascii_complex())
+        debugger.trace("removed contradictions: " + res.ascii_complex())
         debugger.analyse(res)
 
         return res
@@ -82,6 +131,9 @@ class Variable(Proposition):
     def get_literals(self):
         return [self]
 
+    def get_proper_literals(self):
+        return [self]
+
     def get_sub_propositions(self):
         return [self]
 
@@ -92,6 +144,21 @@ class Variable(Proposition):
 
     def cnf_inner(self,debugger=NoDebug()):
         return Variable(self.value)
+
+    def remove_biimpl(self, debugger: Debugger=NoDebug()):
+        return self
+
+    def remove_impl(self, debugger: Debugger=NoDebug()):
+        return self
+
+    def remove_nots(self, debugger: Debugger=NoDebug()):
+        return self
+
+    def distribute_elements(self, debugger: Debugger=NoDebug()):
+        return self
+
+    def merge_ors(self, debugger: Debugger=NoDebug()):
+        return self
 
     def cnf_notation(self):
         return self.value
@@ -158,8 +225,35 @@ class ExtendedProposition(Proposition):
     def get_literals(self):
         return self.propositions[:]
 
+    def get_proper_literals(self):
+        literals = []
+        for p in self.propositions:
+            if p.is_literal():
+                literals += [p]
+            else:
+                raise ValueError(f"Encountered a non-literal in {str(self)} {repr(self)}: {repr(p)}")
+        return literals
+
     def get_sub_propositions(self):
         return self.propositions[:]
+
+    def new_self(self, props: list[Proposition]):
+        raise NotImplementedError()
+
+    def remove_biimpl(self, debugger: Debugger=NoDebug()):
+        return self.new_self([p.remove_biimpl(debugger) for p in self.get_sub_propositions()])
+
+    def remove_impl(self, debugger: Debugger=NoDebug()):
+        return self.new_self([p.remove_impl(debugger) for p in self.get_sub_propositions()])
+
+    def remove_nots(self, debugger: Debugger=NoDebug()):
+        return self.new_self([p.remove_nots(debugger) for p in self.get_sub_propositions()])
+
+    def distribute_elements(self, debugger: Debugger=NoDebug()):
+        return self
+
+    def merge_ors(self, debugger: Debugger=NoDebug()) -> 'Proposition':
+        return self.new_self([p.merge_ors(debugger) for p in self.get_sub_propositions()])
 
     # def cnf(self,debugger=NoDebug()):
     #     if debugger is not None: debugger.analyse(self)
@@ -202,6 +296,16 @@ class MultiAnd(ExtendedProposition):
 
     def cnf_notation(self):
         return "[ " + " , ".join([prop.cnf_notation() for prop in self.propositions]) + " ]"
+    
+    def new_self(self, props: list[Proposition]):
+        return MultiAnd(props)
+
+    def distribute_elements(self, debugger: Debugger=NoDebug()):
+        ands = []
+        for p in self.propositions:
+            ands += [p.distribute_elements(debugger)]
+
+        return MultiAnd(ands)
 
 class MultiOr(ExtendedProposition):
     def ascii_operator(self):
@@ -265,6 +369,31 @@ class MultiOr(ExtendedProposition):
                 raise ValueError(f"CNF format is not correct. Expected variable or not(variable), but got {prop}")
         
         return notation
+    
+    def new_self(self, props: list[Proposition]):
+        return MultiOr(props)
+
+    def distribute_elements(self, debugger: Debugger=NoDebug()):
+        raise NotImplementedError("MultiOr doesnt support distribution")
+
+        # if len(self.propositions) < 2:
+        #     raise ValueError("This MultiOr has less than 2 propositions")
+
+        # ands = []
+        # for i,prop in enumerate(self.propositions):
+        #     ands_here = prop.distribute_elements(debugger).get_proper_literals()
+        #     if i == 0:
+        #         ands += ands_here
+        #         continue
+
+        #     ands_new = []
+        #     for a in ands:
+        #         for b in ands_here:
+        #             ands_new += [OrProposition(a, b)]
+            
+        #     ands = ands_new
+
+        # return MultiAnd(ands)
 
 class CompoundProposition(Proposition):
     def __init__(self, proposition_a: Proposition = None, proposition_b: Proposition = None):
@@ -298,6 +427,30 @@ class CompoundProposition(Proposition):
 
     def is_literal(self):
         return False
+
+    def new_self(self, prop_a: Proposition, prop_b: Proposition):
+        return AndProposition(prop_a, prop_b)
+
+    def remove_impl(self, debugger: Debugger=NoDebug()):
+        return self.new_self(self.proposition_a.remove_impl(debugger), self.proposition_b.remove_impl(debugger))
+
+    def remove_biimpl(self, debugger: Debugger=NoDebug()):
+        return self.new_self(self.proposition_a.remove_biimpl(debugger), self.proposition_b.remove_biimpl(debugger))
+
+    def remove_nots(self, debugger: Debugger=NoDebug()):
+        return self.new_self(self.proposition_a.remove_nots(debugger), self.proposition_b.remove_nots(debugger))
+
+    def distribute_elements(self, debugger: Debugger=NoDebug()):
+        return self
+
+    def get_proper_literals(self):
+        literals = []
+        for p in [self.proposition_a, self.proposition_b]:
+            if p.is_literal():
+                literals += [p]
+            else:
+                raise ValueError(f"Encountered a non-literal in {str(self)} {repr(self)}: {repr(p)}")
+        return literals
 
 class AndProposition(CompoundProposition):
     def ascii_operator(self):
@@ -335,6 +488,21 @@ class AndProposition(CompoundProposition):
         #     debugger.analyse(res)
         # return res
 
+    def new_self(self, prop_a, prop_b):
+        return AndProposition(prop_a, prop_b)
+
+    def distribute_elements(self, debugger: Debugger=NoDebug()):
+        dist_a = self.proposition_a.distribute_elements(debugger)   # Should be ands
+        dist_b = self.proposition_b.distribute_elements(debugger)   # Should be ands
+
+        ands_a = dist_a.get_proper_literals() if type(dist_a) is not MultiAnd else dist_a.get_sub_propositions()
+        ands_b = dist_b.get_proper_literals() if type(dist_b) is not MultiAnd else dist_b.get_sub_propositions()
+
+        ands = ands_a + ands_b
+
+        return MultiAnd(ands)
+
+
 class OrProposition(CompoundProposition):
     def ascii_operator(self):
         return '|'
@@ -344,8 +512,7 @@ class OrProposition(CompoundProposition):
     
     def evaluate(self, state):
         return self.proposition_a.evaluate(state) or self.proposition_b.evaluate(state)
-
-
+    
     def cnf_inner(self,debugger=NoDebug()):
         and_props = []
 
@@ -407,6 +574,39 @@ class OrProposition(CompoundProposition):
         debugger.trace(f"Always same: {always_same} -> ({pi},{pj})")
 
         return always_same
+        
+    def new_self(self, prop_a, prop_b):
+        return OrProposition(prop_a, prop_b)
+
+    def distribute_elements(self, debugger: Debugger=NoDebug()):
+        dist_a = self.proposition_a.distribute_elements(debugger)   # Should be ands
+        dist_b = self.proposition_b.distribute_elements(debugger)   # Should be ands
+
+        ands_a = dist_a.get_proper_literals() if type(dist_a) is not MultiAnd else dist_a.get_sub_propositions()
+        ands_b = dist_b.get_proper_literals() if type(dist_b) is not MultiAnd else dist_b.get_sub_propositions()
+
+        ands = []
+
+        for and_a in ands_a:
+            for and_b in ands_b:
+                ands += [OrProposition(and_a, and_b)]
+
+        return MultiAnd(ands)
+
+    def get_ors(self) -> list[Proposition]:
+        new_ors = []
+        for p in [self.proposition_a, self.proposition_b]:
+            if type(p) is OrProposition or type(p) is MultiOr:
+                new_ors += p.get_ors()
+            elif type(p) is Variable or type(p) is NotProposition:
+                new_ors += [p]
+            else:
+                raise ValueError(f"Cannot get ors from {p} {repr(p)}")
+
+        return new_ors
+
+    def merge_ors(self, debugger: Debugger=NoDebug()):
+        return MultiOr(self.get_ors())
 
 class ImplicationProposition(CompoundProposition):
     def ascii_operator(self):
@@ -431,6 +631,15 @@ class ImplicationProposition(CompoundProposition):
             debugger.analyse(res_cnf)
         # return res
         return res_cnf
+
+    def new_self(self, prop_a, prop_b):
+        return ImplicationProposition(prop_a, prop_b)
+
+    def remove_impl(self, debugger: Debugger=NoDebug()):
+        return OrProposition(
+            NotProposition(self.proposition_a),
+            self.proposition_b
+        ).remove_impl(debugger)
 
 class BiimplicationProposition(CompoundProposition):
     def ascii_operator(self):
@@ -459,6 +668,15 @@ class BiimplicationProposition(CompoundProposition):
             debugger.analyse(res)
         return res
 
+    def remove_biimpl(self, debugger: Debugger=NoDebug()):
+        return OrProposition(
+            AndProposition(self.proposition_a, self.proposition_b),
+            AndProposition(NotProposition(self.proposition_a), NotProposition(self.proposition_b))
+        ).remove_biimpl(debugger)
+
+    def new_self(self, prop_a, prop_b):
+        return BiimplicationProposition(prop_a, prop_b)
+
 class SingularProposition(Proposition):
     def __init__(self, proposition_a: Proposition = None):
         super().__init__()
@@ -485,6 +703,30 @@ class SingularProposition(Proposition):
 
     def is_literal(self):
         return type(self.proposition_a) is Variable
+
+    def new_self(self, prop_a: Proposition):
+        raise NotImplementedError()
+    
+    def remove_biimpl(self, debugger: Debugger=NoDebug()):
+        return self.new_self(self.proposition_a.remove_biimpl(debugger))
+
+    def remove_impl(self, debugger: Debugger=NoDebug()):
+        return self.new_self(self.proposition_a.remove_impl(debugger))
+
+    def remove_nots(self, debugger: Debugger=NoDebug()):
+        return self.new_self(self.proposition_a.remove_nots(debugger))
+
+    def distribute_elements(self, debugger: Debugger=NoDebug()):
+        return self
+
+    def get_proper_literals(self):
+        if self.is_literal():
+            return [self]
+        else:
+            raise ValueError(f"Encountered a non-literal in {str(self)} {repr(self)}: {repr(p)}")
+
+    def merge_ors(self, debugger: Debugger=NoDebug()):
+        return self
 
 class NotProposition(SingularProposition):
     def ascii_operator(self):
@@ -555,3 +797,24 @@ class NotProposition(SingularProposition):
             return self.proposition_a.proposition_a.get_literals()
         else:
             return self.proposition_a.get_literals()
+
+    def new_self(self, prop_a):
+        return NotProposition(prop_a)
+
+    def remove_nots(self, debugger: Debugger=NoDebug()):
+        if type(self.proposition_a) is Variable:
+            return self
+        elif type(self.proposition_a) is NotProposition:
+            return self.proposition_a.proposition_a.remove_nots(debugger)
+        elif type(self.proposition_a) is AndProposition:
+            return OrProposition(
+                NotProposition(self.proposition_a.proposition_a),
+                NotProposition(self.proposition_a.proposition_b)
+            ).remove_nots(debugger)
+        elif type(self.proposition_a) is OrProposition:
+            return AndProposition(
+                NotProposition(self.proposition_a.proposition_a),
+                NotProposition(self.proposition_a.proposition_b)
+            ).remove_nots(debugger)
+        else:
+            raise NotImplementedError()
