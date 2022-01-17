@@ -1,5 +1,6 @@
 from debugger import *
 from ascii_inflictor import *
+from tseitin_tools import *
 
 class Proposition:
     def ascii_operator(self):
@@ -46,6 +47,22 @@ class Proposition:
 
     def merge_ors(self, debugger: Debugger=NoDebug()) -> 'Proposition':
         raise NotImplementedError(repr(self))
+
+    def tseitin_replace(self, variable_namer: VariableNamer, debugger: Debugger=NoDebug()):
+        raise NotImplementedError(repr(self))
+
+    def tseitin(self, debugger: Debugger=NoDebug()) -> 'Proposition':
+        res = self
+        debugger.trace("tseitin start with: " + res.ascii_complex())
+        debugger.analyse(res)
+
+        (rename, ands) = res.tseitin_replace(VariableNamer.from_variables(res.get_variables()), debugger)
+        res = MultiAnd([rename] + ands)
+
+        debugger.trace("after tseitin repl: " + res.ascii_complex())
+        debugger.analyse(res)
+
+        return res
 
     def cnf(self, debugger: Debugger=NoDebug()) -> 'Proposition':
         res = self
@@ -147,6 +164,9 @@ class Variable(Proposition):
 
     def is_literal(self):
         return True
+
+    def tseitin_replace(self, variable_namer: VariableNamer, debugger: Debugger=NoDebug()):
+        return (self, self)
 
 class ExtendedProposition(Proposition):
     def __init__(self, propositions: list[Proposition]):
@@ -277,7 +297,11 @@ class MultiAnd(ExtendedProposition):
     def distribute_elements(self, debugger: Debugger=NoDebug()):
         ands = []
         for p in self.propositions:
-            ands += [p.distribute_elements(debugger)]
+            el = p.distribute_elements(debugger)
+            if type(el) is MultiAnd:
+                ands += el.get_sub_propositions()
+            else:
+                ands += [el]
 
         return MultiAnd(ands)
 
@@ -414,6 +438,34 @@ class CompoundProposition(Proposition):
             else:
                 raise ValueError(f"Encountered a non-literal in {str(self)} {repr(self)}: {repr(p)}")
         return literals
+
+    def tseitin_replace(self, variable_namer: VariableNamer, debugger: Debugger=NoDebug()):
+        self_rename = Variable(variable_namer.next())
+        ands = []
+        left = None
+        right = None
+
+        if self.proposition_a.is_literal() == False:
+            (a_rename, a_ands) = self.proposition_a.tseitin_replace(variable_namer, debugger)
+            ands += a_ands
+            left = a_rename
+        else:
+            left = self.proposition_a
+        
+        if self.proposition_b.is_literal() == False:
+            (b_rename, b_ands) = self.proposition_b.tseitin_replace(variable_namer, debugger)
+            ands += b_ands
+            right = b_rename
+        else:
+            right = self.proposition_b
+
+        prop = BiimplicationProposition(
+            self_rename,
+            self.new_self(left, right)
+        )
+
+        ands = [prop] + ands
+        return (self_rename, ands)
 
 class AndProposition(CompoundProposition):
     def ascii_operator(self):
