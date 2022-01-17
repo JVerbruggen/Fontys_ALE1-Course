@@ -47,24 +47,6 @@ class Proposition:
     def merge_ors(self, debugger: Debugger=NoDebug()) -> 'Proposition':
         raise NotImplementedError(repr(self))
 
-    def cnf_inner(self, debugger: Debugger=NoDebug()) -> 'Proposition':
-        raise NotImplementedError()
-
-    # def cnf(self, debugger: Debugger=NoDebug()) -> 'Proposition':
-    #     debugger.trace("start with: " + self.ascii_complex())
-    #     debugger.analyse(self)
-
-    #     res = self.cnf_inner(debugger=debugger)
-    #     debugger.trace("before contradiction removal: " + res.ascii_complex())
-    #     debugger.analyse(res)
-
-    #     res = res.remove_contradictions()
-
-    #     debugger.trace("after contradiction removal: " + res.ascii_complex())
-    #     debugger.analyse(res)
-
-    #     return res
-
     def cnf(self, debugger: Debugger=NoDebug()) -> 'Proposition':
         res = self
         debugger.trace("start with: " + res.ascii_complex())
@@ -102,7 +84,7 @@ class Proposition:
     def remove_contradictions(self, debugger: Debugger=NoDebug()):
         return self
 
-    def is_always_true_or_false(self, debugger: Debugger=NoDebug()) -> bool:
+    def is_always_same(self, debugger: Debugger=NoDebug()) -> bool:
         return False
 
     def concat_sub_propositions(self, other: 'Proposition') -> list['Proposition']:
@@ -141,9 +123,6 @@ class Variable(Proposition):
         if self.value in state.keys():
             return state[self.value]
         return False
-
-    def cnf_inner(self,debugger=NoDebug()):
-        return Variable(self.value)
 
     def remove_biimpl(self, debugger: Debugger=NoDebug()):
         return self
@@ -279,17 +258,12 @@ class MultiAnd(ExtendedProposition):
         for i in range(1, len(self.propositions)):
             res = res and self.propositions[i].evaluate(state)
         return res
-    
-    def cnf_inner(self,debugger=NoDebug()):
-        props = self.get_sub_propositions()
-        props = [p.cnf_inner(debugger) for p in props]
-        return MultiAnd(props)
 
     def cnf_notation(self):
         raise NotImplementedError()
 
     def remove_contradictions(self, debugger: Debugger=NoDebug()):
-        return MultiAnd([p for p in self.propositions if p.is_always_true_or_false() == False])
+        return MultiAnd([p for p in self.propositions if p.is_always_same() == False])
     
     def absorb(self, other: 'MultiAnd'):
         return MultiAnd(self.propositions + other.propositions)
@@ -320,19 +294,8 @@ class MultiOr(ExtendedProposition):
         for i in range(1, len(self.propositions)):
             res = res or self.propositions[i].evaluate(state)
         return res
-    
-    def cnf_inner(self,debugger=NoDebug()):
-        props = self.get_sub_propositions()
-        props = [p.cnf_inner(debugger) for p in props]
-        return MultiOr(props)
 
-        # props = self.get_sub_propositions()
-        # if len(props) != 2:
-        #     raise NotImplementedError()
-
-        # return OrProposition(props[0], prop[1]).cnf_inner(debugger)
-
-    def is_always_true_or_false(self, debugger: Debugger=NoDebug()) -> bool:
+    def is_always_same(self, debugger: Debugger=NoDebug()) -> bool:
         always_same = False
 
         for i in range(len(self.propositions)):
@@ -461,32 +424,6 @@ class AndProposition(CompoundProposition):
 
     def evaluate(self, state):
         return self.proposition_a.evaluate(state) and self.proposition_b.evaluate(state)
-    
-    def cnf_inner(self,debugger=NoDebug()):
-        if self.proposition_a == None or self.proposition_b == None:
-            raise ValueError("Propositions in strategies not defined")
-
-        pa = self.proposition_a.cnf_inner(debugger)
-        pb = self.proposition_b.cnf_inner(debugger)
-
-        and_props = list()
-        for prop in [pa, pb]:                   # merge child ands into itself
-            if type(prop) is AndProposition:
-                and_props += [prop.proposition_a, prop.proposition_b]
-            elif type(prop) is MultiAnd:
-                and_props += prop.propositions
-            else:
-                and_props += [prop]
-
-
-        return MultiAnd(and_props)
-        # pa_items = self.proposition_a.cnf_inner(debugger).get_literals()
-        # pb_items = self.proposition_b.cnf_inner(debugger).get_literals()
-        # res = MultiAnd(pa_items + pb_items)
-        # if debugger is not None: 
-        #     debugger.trace(res.ascii_complex())
-        #     debugger.analyse(res)
-        # return res
 
     def new_self(self, prop_a, prop_b):
         return AndProposition(prop_a, prop_b)
@@ -513,51 +450,7 @@ class OrProposition(CompoundProposition):
     def evaluate(self, state):
         return self.proposition_a.evaluate(state) or self.proposition_b.evaluate(state)
     
-    def cnf_inner(self,debugger=NoDebug()):
-        and_props = []
-
-        prop_a = self.proposition_a.cnf_inner(debugger)
-        prop_b = self.proposition_b.cnf_inner(debugger)
-
-        if type(prop_a) is not AndProposition and type(prop_a) is not MultiAnd and prop_a.is_literal() == False:
-            raise ValueError(f"Expected AndProposition, MultiAnd or literal at prop_a 'or' CNF but got: {type(prop_a)} ({prop_a})")
-        if type(prop_b) is not AndProposition and type(prop_b) is not MultiAnd and prop_b.is_literal() == False:
-            raise ValueError(f"Expected AndProposition, MultiAnd or literal at prop_b 'or' CNF but got: {type(prop_b)} ({prop_b})")
-
-        p_items = prop_a.get_literals()
-        q_items = prop_b.get_literals()
-
-        if debugger is not None:
-            debugger.analyse(self)
-            debugger.trace("OR1: " + str(prop_a.ascii_complex()))
-            debugger.trace("OR2: " + str(prop_b.ascii_complex()))
-            # debugger.trace("LIT: " + str([x.ascii_complex() for x in p_items + q_items]))
-
-
-        for p_item in p_items:
-            for q_item in q_items:
-                adding = []
-
-                for item in [p_item, q_item]:
-                    if item.is_literal():
-                        adding += [item]
-                    elif type(item) is OrProposition or type(item) is MultiOr:
-                        adding += item.get_sub_propositions()
-                
-
-                and_props += [MultiOr(adding)]
-
-        # if len(and_props) == 1:
-        #     return and_props[0]
-
-        res = MultiAnd(and_props)
-        # Dont CNF this, only CNF its children
-        if debugger is not None: 
-            debugger.trace(res.ascii_complex())
-            debugger.analyse(res)
-        return res
-    
-    def is_always_true_or_false(self, debugger: Debugger=NoDebug()) -> bool:
+    def is_always_same(self, debugger: Debugger=NoDebug()) -> bool:
         pi = self.proposition_a
         pj = self.proposition_b
         always_same = (
@@ -618,19 +511,6 @@ class ImplicationProposition(CompoundProposition):
     def evaluate(self, state):
         pa_evaluated = self.proposition_a.evaluate(state)
         return not pa_evaluated or (pa_evaluated and self.proposition_b.evaluate(state))
-    
-    def cnf_inner(self,debugger=NoDebug()):
-        res = OrProposition(NotProposition(self.proposition_a), 
-            self.proposition_b
-            )
-        res_cnf = res.cnf_inner(debugger)
-        if debugger is not None: 
-            debugger.trace(res.ascii_complex())
-            debugger.analyse(res)
-            debugger.trace(res_cnf.ascii_complex())
-            debugger.analyse(res_cnf)
-        # return res
-        return res_cnf
 
     def new_self(self, prop_a, prop_b):
         return ImplicationProposition(prop_a, prop_b)
@@ -650,23 +530,6 @@ class BiimplicationProposition(CompoundProposition):
     
     def evaluate(self, state):
         return self.proposition_a.evaluate(state) == self.proposition_b.evaluate(state)
-
-    def cnf_inner(self,debugger=NoDebug()):
-        reformat = OrProposition(
-            AndProposition(
-                self.proposition_a,
-                self.proposition_b
-            ),
-            AndProposition(
-                NotProposition(self.proposition_a),
-                NotProposition(self.proposition_b)
-            )
-        )
-        res = reformat.cnf_inner(debugger)
-        if debugger is not None: 
-            debugger.trace(res.ascii_complex())
-            debugger.analyse(res)
-        return res
 
     def remove_biimpl(self, debugger: Debugger=NoDebug()):
         return OrProposition(
@@ -737,58 +600,6 @@ class NotProposition(SingularProposition):
     
     def evaluate(self, state):
         return not self.proposition_a.evaluate(state)
-    
-    def cnf_inner(self,debugger=NoDebug()):
-        # Very not OOP, but if delegated to operator we would have circular import?
-        pa_type = type(self.proposition_a)
-        if pa_type is Variable:
-            return self
-        elif issubclass(pa_type, SingularProposition):
-            return self.proposition_a.proposition_a.cnf_inner(debugger)
-        elif issubclass(pa_type, CompoundProposition):
-            if pa_type is AndProposition:
-                pa = self.proposition_a.proposition_a
-                pb = self.proposition_a.proposition_b
-                res = OrProposition(
-                    NotProposition(pa),
-                    NotProposition(pb)
-                    )
-                res_cnf = res.cnf_inner(debugger)
-                debugger.trace("in NOT (and): " + res.ascii_complex())
-                debugger.analyse(res)
-                debugger.trace("in NOT after (and): " + res_cnf.ascii_complex())
-                debugger.analyse(res_cnf)
-                return res_cnf
-            elif pa_type is OrProposition:
-                pa = self.proposition_a.proposition_a
-                pb = self.proposition_a.proposition_b
-                res = AndProposition(
-                    NotProposition(pa),
-                    NotProposition(pb)
-                    )
-                res_cnf = res.cnf_inner(debugger)
-                debugger.trace("in NOT (or): " + res.ascii_complex())
-                debugger.analyse(res)
-                debugger.trace("in NOT after (or): " + res_cnf.ascii_complex())
-                debugger.analyse(res_cnf)
-                return res_cnf
-            else:
-                return NotProposition(self.proposition_a.cnf_inner(debugger)).cnf_inner(debugger)
-            raise Exception("Unsupported operator")
-        elif issubclass(pa_type, ExtendedProposition): 
-            old_props = self.proposition_a.get_sub_propositions()
-            props = [NotProposition(p) for p in old_props]
-            res = MultiAnd(props) if pa_type == MultiOr else MultiOr(props)
-            res_cnf = res.cnf()
-
-            if debugger is not None: 
-                debugger.trace("in NOT (extended): " + res.ascii_complex())
-                debugger.analyse(res)
-                debugger.trace("in NOT after (extended): " + res_cnf.ascii_complex())
-                debugger.analyse(res_cnf)
-            
-            return res_cnf
-        raise Exception("Unsupported operator")     
 
     def get_literals(self):
         if type(self.proposition_a) is Variable:
