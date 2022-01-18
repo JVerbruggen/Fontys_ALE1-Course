@@ -254,11 +254,6 @@ class ExtendedProposition(Proposition):
     def merge_ors(self, debugger: Debugger=NoDebug()) -> 'Proposition':
         return self.new_self([p.merge_ors(debugger) for p in self.get_sub_propositions()])
 
-    # def cnf(self,debugger=NoDebug()):
-    #     if debugger is not None: debugger.analyse(self)
-    #     return self.get_rational_equivalent().cnf(debugger)
-    #     # raise Exception("CNF not available for extended proposition")
-
     def __str__(self):
         return self.ascii()
     
@@ -360,28 +355,6 @@ class MultiOr(ExtendedProposition):
     def new_self(self, props: list[Proposition]):
         return MultiOr(props)
 
-    def distribute_elements(self, debugger: Debugger=NoDebug()):
-        raise NotImplementedError("MultiOr doesnt support distribution")
-
-        # if len(self.propositions) < 2:
-        #     raise ValueError("This MultiOr has less than 2 propositions")
-
-        # ands = []
-        # for i,prop in enumerate(self.propositions):
-        #     ands_here = prop.distribute_elements(debugger).get_proper_literals()
-        #     if i == 0:
-        #         ands += ands_here
-        #         continue
-
-        #     ands_new = []
-        #     for a in ands:
-        #         for b in ands_here:
-        #             ands_new += [OrProposition(a, b)]
-            
-        #     ands = ands_new
-
-        # return MultiAnd(ands)
-
 class CompoundProposition(Proposition):
     def __init__(self, proposition_a: Proposition = None, proposition_b: Proposition = None):
         super().__init__()
@@ -440,28 +413,21 @@ class CompoundProposition(Proposition):
         return literals
 
     def tseitin_replace(self, variable_namer: VariableNamer, debugger: Debugger=NoDebug()):
-        self_rename = Variable(variable_namer.next())
         ands = []
-        left = None
-        right = None
+        prop_sides = []
 
-        if self.proposition_a.is_literal() == False:
-            (a_rename, a_ands) = self.proposition_a.tseitin_replace(variable_namer, debugger)
-            ands += a_ands
-            left = a_rename
-        else:
-            left = self.proposition_a
-        
-        if self.proposition_b.is_literal() == False:
-            (b_rename, b_ands) = self.proposition_b.tseitin_replace(variable_namer, debugger)
-            ands += b_ands
-            right = b_rename
-        else:
-            right = self.proposition_b
+        for p in [self.proposition_a, self.proposition_b]:
+            if type(p) is Variable:
+                prop_sides += [p]
+            else:
+                (p_rename, p_ands) = p.tseitin_replace(variable_namer, debugger)
+                ands += p_ands
+                prop_sides += [p_rename]
 
+        self_rename = Variable(variable_namer.next())
         prop = BiimplicationProposition(
             self_rename,
-            self.new_self(left, right)
+            self.new_self(prop_sides[0], prop_sides[1])
         )
 
         ands = [prop] + ands
@@ -642,6 +608,27 @@ class SingularProposition(Proposition):
 
     def merge_ors(self, debugger: Debugger=NoDebug()):
         return self
+
+    def tseitin_replace(self, variable_namer: VariableNamer, debugger: Debugger=NoDebug()):
+        ands = []
+        prop_sides = []
+
+        p = self.proposition_a
+        if type(p) is Variable:
+            prop_sides += [p]
+        else:
+            (p_rename, p_ands) = p.tseitin_replace(variable_namer, debugger)
+            ands += p_ands
+            prop_sides += [p_rename]
+
+        self_rename = Variable(variable_namer.next())
+        prop = BiimplicationProposition(
+            self_rename,
+            self.new_self(prop_sides[0])
+        )
+
+        ands = [prop] + ands
+        return (self_rename, ands)
 
 class NotProposition(SingularProposition):
     def ascii_operator(self):

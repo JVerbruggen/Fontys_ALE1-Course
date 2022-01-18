@@ -11,14 +11,13 @@ class VariableNamer:
         return vn
 
     def process_variables(self, variables: list[str]):
-        last = 0
         for var in variables:
             if var.isalpha() == False:
                 raise ValueError(f"Cannot process variable '{var}'")
             if var.isupper() == False: continue
-            i = VariableNamer.LETTERS.index(var.upper())
-            if i > last:
-                last = i
+            i = VariableNamer.LETTERS.index(var)
+            if i > self.last:
+                self.last = i
 
     def next(self) -> str:
         new_i = self.last + 1
